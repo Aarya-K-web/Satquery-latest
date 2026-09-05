@@ -1,0 +1,20 @@
+# Python cache & build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Temporary uploads & logs
+uploads/
+*.log
+
+# Environments & IDEs
+.venv/
+venv/
+ENV/
+.vscode/
+.idea/
+.DS_Store

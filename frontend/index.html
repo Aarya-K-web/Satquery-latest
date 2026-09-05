@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ISRO SatQuery EvidenceSwarm — Multi-Sensor Intelligence</title>
+  
+  <!-- Modern ISRO Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- CesiumJS CSS & JS -->
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Cesium.js"></script>
+
+  <!-- Custom ISRO-grade Stylesheet -->
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="isro-theme">
+  <!-- Top App Bar -->
+  <header class="top-nav">
+    <div class="nav-left">
+      <div class="isro-emblem">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="12" r="10" stroke="#00f0ff" stroke-opacity="0.8"/>
+          <ellipse cx="12" cy="12" rx="10" ry="4" stroke="#ffaa00" stroke-dasharray="2,2"/>
+          <circle cx="12" cy="12" r="2.5" fill="#00f0ff"/>
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="#00f0ff"/>
+        </svg>
+      </div>
+      <div class="brand-titles">
+        <div class="brand-title">SATQUERY <span class="brand-accent">EVIDENCESWARM</span></div>
+        <div class="brand-sub">SIH26167 :: MULTI-SENSOR ISRO-GRADE REASONING CORE</div>
+      </div>
+    </div>
+    <div class="nav-center">
+      <div class="nav-status-pill">
+        <span class="status-dot pulse-green"></span>
+        <span class="status-text">MISSION ORCHESTRATOR ONLINE</span>
+      </div>
+      <div class="nav-status-pill">
+        <span class="status-label">LATENCY</span>
+        <span class="status-val" id="hud-latency">14ms</span>
+      </div>
+    </div>
+    <div class="nav-right">
+      <div class="mode-tag">PHASE 1 NON-GPU STACK</div>
+      <button class="nav-btn" id="btn-reset-globe" title="Reset Globe to India Center">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+        <span>CENTER INDIA</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 3-Panel Main Layout -->
+  <main class="swarm-viewport">
+    
+    <!-- LEFT PANEL: INGESTION & QUERY CONTROL (≈30%) -->
+    <section class="panel panel-left" id="panel-query-control">
+      <div class="panel-header">
+        <div class="panel-header-title">
+          <span class="panel-num">01</span>
+          <h2>INGESTION &amp; QUERY CONTROL</h2>
+        </div>
+        <span class="panel-badge">INPUT GATE</span>
+      </div>
+
+      <div class="panel-content scroll-y">
+        <!-- Preset Frozen Demo Cases -->
+        <div class="control-block">
+          <div class="block-label">
+            <span>PRESET DEMO BEATS (FROZEN)</span>
+            <span class="badge-subtle">4 BEATS</span>
+          </div>
+          <div class="demo-beats-grid">
+            <button class="beat-btn active" data-beat="1">
+              <span class="beat-num">BEAT 1</span>
+              <span class="beat-name">Single VQA (S2)</span>
+            </button>
+            <button class="beat-btn" data-beat="2">
+              <span class="beat-num">BEAT 2</span>
+              <span class="beat-name">Change Det. (Flood)</span>
+            </button>
+            <button class="beat-btn" data-beat="3">
+              <span class="beat-num">BEAT 3</span>
+              <span class="beat-name">Optical + SAR</span>
+            </button>
+            <button class="beat-btn" data-beat="4">
+              <span class="beat-num">BEAT 4</span>
+              <span class="beat-name">Signature Refusal</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- GeoTIFF File Upload Area -->
+        <div class="control-block">
+          <div class="block-label">
+            <span>SATELLITE GEOTIFF INGESTION</span>
+            <span class="badge-subtle">1–2 TILES (CRS ENFORCED)</span>
+          </div>
+          <div class="dropzone" id="geotiff-dropzone">
+            <input type="file" id="file-input" multiple accept=".tif,.tiff" class="file-input-hidden" />
+            <div class="dropzone-content">
+              <div class="dropzone-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#00f0ff" stroke-width="1.6">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+              </div>
+              <div class="dropzone-text">
+                <strong>DRAG &amp; DROP GEOTIFFs</strong> or <span class="browse-link">BROWSE FILES</span>
+              </div>
+              <div class="dropzone-hint">Accepts Sentinel-2, Sentinel-1, Cartosat (.tif)</div>
+            </div>
+          </div>
+
+          <!-- Uploaded Files List -->
+          <div class="uploaded-files-list" id="uploaded-files-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Query Input Box -->
+        <div class="control-block">
+          <div class="block-label">
+            <span>NATURAL-LANGUAGE REASONING QUERY</span>
+          </div>
+          <div class="query-box-wrapper">
+            <textarea id="query-input" rows="3" placeholder="Ask a geospatial reasoning question (e.g. 'What land cover types are visible in this image?')..."></textarea>
+            <div class="suggested-queries" id="suggested-queries">
+              <span class="sugg-chip" data-q="What land cover types are visible in this image?">Land Cover Types</span>
+              <span class="sugg-chip" data-q="What areas changed between these two dates?">Flood Extent Delta</span>
+              <span class="sugg-chip" data-q="What features are visible in SAR but obscured in the optical image?">SAR Cloud Penetration</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <button class="submit-btn" id="btn-submit-query">
+          <span class="btn-spinner hidden" id="submit-spinner"></span>
+          <span class="btn-text" id="submit-btn-text">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            SUBMIT EVIDENCE QUERY
+          </span>
+        </button>
+
+        <!-- Spectral Quick-Check Tool -->
+        <div class="control-block collapsible-block">
+          <div class="collapsible-header" id="spectral-toggle">
+            <div class="block-label-inline">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffaa00" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 6v6l4 2"/>
+              </svg>
+              <span>ON-DEMAND CPU SPECTRAL INDICES (NDWI / NDVI)</span>
+            </div>
+            <span class="collapse-icon">▾</span>
+          </div>
+          <div class="collapsible-body" id="spectral-body">
+            <div class="spectral-actions">
+              <button class="spectral-btn" id="btn-run-ndwi">CALCULATE NDWI (WATER)</button>
+              <button class="spectral-btn" id="btn-run-ndvi">CALCULATE NDVI (VEG)</button>
+            </div>
+            <div class="spectral-result-box hidden" id="spectral-result-box">
+              <div class="spec-metrics" id="spec-metrics"></div>
+              <div class="spec-preview" id="spec-preview"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RESULTS & REPORT AREA -->
+        <div class="results-container" id="results-container">
+          <div class="block-label">
+            <span>EVIDENCE SYNTHESIS &amp; REASONING OUTPUT</span>
+          </div>
+
+          <!-- Empty State -->
+          <div class="results-empty" id="results-empty">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            <p>Awaiting query execution or sample selection.</p>
+          </div>
+
+          <!-- Refusal Alert Card -->
+          <div class="refusal-card hidden" id="refusal-card">
+            <div class="refusal-header">
+              <span class="refusal-icon">⛔</span>
+              <div class="refusal-title">
+                <strong>EVIDENCE CONTRACT REFUSAL GATE</strong>
+                <span>PRE-FLIGHT VALIDATION REJECTED</span>
+              </div>
+            </div>
+            <div class="refusal-reason" id="refusal-reason-text"></div>
+            <div class="refusal-remediation">
+              <strong>REQUIRED REMEDIATION:</strong>
+              <span id="refusal-suggestion-text"></span>
+            </div>
+          </div>
+
+          <!-- Success Answer Card -->
+          <div class="answer-card hidden" id="answer-card">
+            <div class="answer-header">
+              <div class="fidelity-badge" id="fidelity-badge">FULL FIDELITY (QWEN2-VL)</div>
+              <div class="specialist-tag" id="specialist-tag">vqa_specialist</div>
+            </div>
+            <div class="answer-text" id="answer-text"></div>
+            
+            <!-- PDF Download & Action Bar -->
+            <div class="report-actions">
+              <button class="report-btn" id="btn-download-pdf">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                DOWNLOAD ISRO EVIDENCE REPORT (PDF)
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- CENTER PANEL: CESIUM 3D PHOTOREALISTIC GLOBE (≈40%) -->
+    <section class="panel panel-center" id="panel-globe">
+      <div class="globe-overlay-header">
+        <div class="globe-title-group">
+          <span class="globe-badge">ORBITAL 3D ENGINE</span>
+          <h1>PLANETARY SPATIAL REASONING GLOBE</h1>
+        </div>
+        <div class="globe-hud-metrics">
+          <div class="hud-item">
+            <span class="hud-k">LON</span>
+            <span class="hud-v" id="hud-lon">72.9500° E</span>
+          </div>
+          <div class="hud-item">
+            <span class="hud-k">LAT</span>
+            <span class="hud-v" id="hud-lat">19.1000° N</span>
+          </div>
+          <div class="hud-item">
+            <span class="hud-k">ALTITUDE</span>
+            <span class="hud-v" id="hud-alt">25.0 km</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cesium Container -->
+      <div id="cesiumContainer" class="cesium-container"></div>
+
+      <!-- Globe Footprint Telemetry HUD -->
+      <div class="globe-footprint-hud" id="globe-footprint-hud">
+        <div class="hud-footprint-status">
+          <span class="footprint-indicator active"></span>
+          <span id="footprint-label">FOOTPRINT: BBOX SYNCHRONIZED</span>
+        </div>
+        <div class="hud-coords" id="footprint-bounds-text">
+          [72.8250°E, 18.9750°N] → [73.0750°E, 19.2250°N]
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL: SENSOR CARD, EVIDENCE BREAKDOWN & LOGS (≈30%) -->
+    <section class="panel panel-right" id="panel-telemetry">
+      <div class="panel-header">
+        <div class="panel-header-title">
+          <span class="panel-num">03</span>
+          <h2>TELEMETRY &amp; AUDIT TRAIL</h2>
+        </div>
+        <span class="panel-badge">ISRO SENSOR CARD</span>
+      </div>
+
+      <div class="panel-content scroll-y">
+        
+        <!-- SENSOR CARD COMPONENT -->
+        <div class="telemetry-card" id="sensor-card-container">
+          <div class="card-top-bar">
+            <div class="sensor-title-row">
+              <span class="sensor-icon">🛰️</span>
+              <span class="sensor-name" id="sc-sensor-name">Sentinel-2B MSI</span>
+            </div>
+            <div class="uncertainty-badge badge-low" id="sc-uncertainty-badge">
+              <span class="badge-dot"></span>
+              <span id="sc-uncertainty-text">UNCERTAINTY: 0.17 (LOW)</span>
+            </div>
+          </div>
+
+          <div class="sensor-grid">
+            <div class="sc-cell">
+              <span class="sc-label">RESOLUTION</span>
+              <span class="sc-val" id="sc-res">10.0 m/px</span>
+            </div>
+            <div class="sc-cell">
+              <span class="sc-label">GRID EXTENT</span>
+              <span class="sc-val" id="sc-extent">512 × 512 px</span>
+            </div>
+            <div class="sc-cell">
+              <span class="sc-label">PROJECTION (CRS)</span>
+              <span class="sc-val" id="sc-crs">EPSG:32643 (UTM 43N)</span>
+            </div>
+            <div class="sc-cell">
+              <span class="sc-label">CHANNELS</span>
+              <span class="sc-val" id="sc-channels">4 Bands (VNIR)</span>
+            </div>
+          </div>
+
+          <!-- Bands Chips -->
+          <div class="sc-bands-row" id="sc-bands-list">
+            <span class="band-chip">B2 (Blue 490nm)</span>
+            <span class="band-chip">B3 (Green 560nm)</span>
+            <span class="band-chip">B4 (Red 665nm)</span>
+            <span class="band-chip">B8 (NIR 842nm)</span>
+          </div>
+
+          <!-- Native Bounds -->
+          <div class="sc-footer-info">
+            <div class="sc-foot-line">
+              <span class="sc-k">CENTROID:</span>
+              <span class="sc-v" id="sc-centroid">72.9500° E, 19.1000° N</span>
+            </div>
+            <div class="sc-foot-line">
+              <span class="sc-k">FILE SIZE:</span>
+              <span class="sc-v" id="sc-filesize">4.12 MB</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- EVIDENCE SCORE BREAKDOWN -->
+        <div class="telemetry-card">
+          <div class="block-label">
+            <span>EVIDENCE SCORE BREAKDOWN (SCORE_CONF)</span>
+          </div>
+
+          <div class="conf-aggregate-row">
+            <div class="conf-gauge-box">
+              <div class="conf-big-num" id="conf-agg-num">0.89</div>
+              <div class="conf-scale-max">/ 1.00</div>
+            </div>
+            <div class="conf-label-box">
+              <div class="conf-status-tag tag-high" id="conf-agg-label">HIGH EVIDENCE CONSISTENCY</div>
+              <div class="conf-formula-hint">Score = 0.15·C_sensor + 0.35·C_adapter + 0.25·C_guard + 0.25·C_spectral</div>
+            </div>
+          </div>
+
+          <!-- Sub-score Progress Bars -->
+          <div class="subscores-list">
+            <div class="subscore-item">
+              <div class="subscore-header">
+                <span class="subscore-title">C_sensor (Sensor Baseline Quality)</span>
+                <span class="subscore-val" id="val-c-sensor">0.83</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" id="bar-c-sensor" style="width: 83%;"></div></div>
+            </div>
+
+            <div class="subscore-item">
+              <div class="subscore-header">
+                <span class="subscore-title">C_adapter (Specialist Reasoning)</span>
+                <span class="subscore-val" id="val-c-adapter">0.93</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" id="bar-c-adapter" style="width: 93%;"></div></div>
+            </div>
+
+            <div class="subscore-item">
+              <div class="subscore-header">
+                <span class="subscore-title">C_guard (Spatial Grounding Guard)</span>
+                <span class="subscore-val" id="val-c-guard">0.90</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" id="bar-c-guard" style="width: 90%;"></div></div>
+            </div>
+
+            <div class="subscore-item">
+              <div class="subscore-header">
+                <span class="subscore-title">C_spectral (NDWI / NDVI Otsu Check)</span>
+                <span class="subscore-val" id="val-c-spectral">0.88</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" id="bar-c-spectral" style="width: 88%;"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AUDITABLE EXECUTION LOGS -->
+        <div class="telemetry-card">
+          <div class="block-label-between">
+            <span>AUDITABLE EXECUTION TRACE</span>
+            <span class="trace-badge">SQLITE LOGGED</span>
+          </div>
+
+          <div class="trace-timeline" id="trace-timeline">
+            <div class="trace-step pass">
+              <span class="trace-dot"></span>
+              <div class="trace-info">
+                <div class="trace-row">
+                  <strong class="trace-title">01 :: Input Gate</strong>
+                  <span class="trace-ms">11ms</span>
+                </div>
+                <div class="trace-desc">Validated 4-band Sentinel-2 GeoTIFF (EPSG:32643)</div>
+              </div>
+            </div>
+
+            <div class="trace-step pass">
+              <span class="trace-dot"></span>
+              <div class="trace-info">
+                <div class="trace-row">
+                  <strong class="trace-title">02 :: Sensor Card</strong>
+                  <span class="trace-ms">4ms</span>
+                </div>
+                <div class="trace-desc">Extracted telemetry (C_sensor=0.83, Low Uncertainty)</div>
+              </div>
+            </div>
+
+            <div class="trace-step pass">
+              <span class="trace-dot"></span>
+              <div class="trace-info">
+                <div class="trace-row">
+                  <strong class="trace-title">03 :: Evidence Contract</strong>
+                  <span class="trace-ms">2ms</span>
+                </div>
+                <div class="trace-desc">Pre-flight verified spatial bounds &amp; band requirements</div>
+              </div>
+            </div>
+
+            <div class="trace-step pass">
+              <span class="trace-dot"></span>
+              <div class="trace-info">
+                <div class="trace-row">
+                  <strong class="trace-title">04 :: Agentic Router</strong>
+                  <span class="trace-ms">18ms</span>
+                </div>
+                <div class="trace-desc">Dispatched to vqa_specialist (cosine sim: 0.94)</div>
+              </div>
+            </div>
+
+            <div class="trace-step pass">
+              <span class="trace-dot"></span>
+              <div class="trace-info">
+                <div class="trace-row">
+                  <strong class="trace-title">05 :: Specialist Inference</strong>
+                  <span class="trace-ms">780ms</span>
+                </div>
+                <div class="trace-desc">Qwen2-VL-2B instruction tuned reasoning completed</div>
+              </div>
+            </div>
+
+            <div class="trace-step pass">
+              <span class="trace-dot"></span>
+              <div class="trace-info">
+                <div class="trace-row">
+                  <strong class="trace-title">06 :: Evidence Guard</strong>
+                  <span class="trace-ms">55ms</span>
+                </div>
+                <div class="trace-desc">Pure NumPy Otsu cross-check IoU=0.88 verified</div>
+              </div>
+            </div>
+
+            <div class="trace-step pass">
+              <span class="trace-dot"></span>
+              <div class="trace-info">
+                <div class="trace-row">
+                  <strong class="trace-title">07 :: Confidence Engine</strong>
+                  <span class="trace-ms">2ms</span>
+                </div>
+                <div class="trace-desc">Calculated score 0.89 (High Evidence Consistency)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Main JavaScript App -->
+  <script src="/static/app.js"></script>
+</body>
+</html>

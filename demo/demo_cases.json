@@ -1,0 +1,56 @@
+[
+  {
+    "beat": 1,
+    "name": "Single-Image VQA Baseline",
+    "description": "Baseline natural-language visual question answering on a single Sentinel-2 multispectral tile with spatial grounding verification.",
+    "images": ["sentinel2_urban_mumbai.tif"],
+    "query": "What land cover types are visible in this image?",
+    "expected_specialist": "vqa_specialist",
+    "expected_status": "success",
+    "fidelity": "full",
+    "expected_answer_contains": ["urban", "water body", "vegetation"],
+    "tags": ["vqa", "sentinel-2", "optical", "grounding"]
+  },
+  {
+    "beat": 2,
+    "name": "Bi-Temporal Change Detection",
+    "description": "Bi-temporal inundation / change detection comparing pre-event and post-event satellite observations over the Kerala river basin.",
+    "images": [
+      "sentinel2_flood_pre_kerala.tif",
+      "sentinel2_flood_post_kerala.tif"
+    ],
+    "query": "What areas changed between these two dates?",
+    "expected_specialist": "change_detection",
+    "expected_status": "success",
+    "fidelity": "reduced",
+    "expected_answer_contains": ["change detected", "inundation", "expansion"],
+    "tags": ["change_detection", "bi-temporal", "flood", "sentinel-2"]
+  },
+  {
+    "beat": 3,
+    "name": "Optical-SAR Multi-Sensor Fusion",
+    "description": "Cross-modal sensor fusion combining Sentinel-2 optical multispectral imagery with Sentinel-1 C-SAR radar backscatter to penetrate cloud/atmospheric obscuration.",
+    "images": [
+      "sentinel2_urban_mumbai.tif",
+      "sentinel1_sar_mumbai.tif"
+    ],
+    "query": "What features are visible in SAR but obscured in the optical image?",
+    "expected_specialist": "optical_sar_fusion",
+    "expected_status": "success",
+    "fidelity": "reduced",
+    "expected_answer_contains": ["SAR backscatter", "roughness", "dielectric properties"],
+    "tags": ["fusion", "sar", "optical", "sentinel-1", "sentinel-2"]
+  },
+  {
+    "beat": 4,
+    "name": "The Signature Refusal Gate",
+    "description": "Evidence Contract pre-flight verification refusal: detects missing required second temporal image for change detection query, issuing clear, actionable refusal and remediation guidance.",
+    "images": ["sentinel2_urban_mumbai.tif"],
+    "query": "Show me changes between the two dates",
+    "expected_specialist": "none",
+    "expected_status": "refused",
+    "fidelity": "refusal_gate",
+    "expected_reason_contains": "Requires two co-registered temporal GeoTIFF files",
+    "tags": ["refusal", "evidence_contract", "guardrail"]
+  }
+]
