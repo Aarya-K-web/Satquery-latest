@@ -18,7 +18,7 @@ from typing import List, Optional, Dict, Any
 import numpy as np
 from PIL import Image
 
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Query
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Query, Response, Body
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,6 +33,9 @@ from src.specialists.caption_grounding import run as run_caption_grounding
 from src.specialists.change_detection import run as run_change_detection
 from src.specialists.optical_sar_fusion import run as run_optical_sar_fusion
 from src.specialists.vqa_specialist import infer as vqa_infer
+from src.evidence_guard import verify_evidence
+from src.confidence_engine import calculate_confidence
+from src.output_renderer import generate_pdf_report
 
 # Initialize FastAPI App
 app = FastAPI(
@@ -75,26 +78,53 @@ async def serve_index():
     return HTMLResponse(content="<h2>SatQuery EvidenceSwarm Frontend Loading...</h2>")
 
 
+def get_vqa_engine_mode() -> str:
+    """Detects whether VQA is connected to a GPU tunnel, local GPU, or CPU fallback."""
+    vqa_url = os.getenv("VQA_SERVER_URL", "http://127.0.0.1:8001/infer")
+    health_url = vqa_url.replace("/infer", "/health")
+    try:
+        req = urllib.request.Request(health_url, method="GET")
+        with urllib.request.urlopen(req, timeout=1.2) as response:
+            if response.status == 200:
+                if any(t in vqa_url for t in ["ngrok", "loca.lt", "pinggy", "trycloudflare", "remote", "tailscale"]):
+                    return "GPU (Tunnel / Remote)"
+                return "GPU (Local)"
+    except Exception:
+        pass
+
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return "GPU (Local)"
+    except Exception:
+        pass
+
+    return "CPU Fallback"
+
+
 @app.get("/health")
 async def health():
     """System health, SQLite trace status, and subsystem telemetry."""
+    vqa_mode = get_vqa_engine_mode()
     return {
         "status": "online",
         "system": "SatQuery EvidenceSwarm",
         "mission_id": "SIH26167",
         "mode": "ISRO-Grade Geospatial Reasoning Core",
         "version": "3.0.0",
+        "vqa_engine_mode": vqa_mode,
         "subsystems": {
             "input_gate": "active",
             "sensor_card": "active",
             "evidence_contract": "active_strict_refusal",
             "agentic_router": "active_rule_keyword",
             "trace_logger": "active_sqlite",
-            "evidence_guard": "active_spectral",
+            "evidence_guard": "active_dual_verification",
+            "confidence_engine": "active_4factor_formula",
             "caption_grounding": "active_cpu_reduced",
             "change_detection": "active_cpu_reduced",
             "optical_sar_fusion": "active_cpu_reduced",
-            "vqa_specialist": "active_gpu_with_cpu_fallback"
+            "vqa_specialist": f"active_{vqa_mode.lower().replace(' ', '_').replace('(', '').replace(')', '').replace('/', '_')}"
         }
     }
 
@@ -514,36 +544,33 @@ async def execute_query(
 
         # Stage 6: Evidence Guard
         tracer.start_stage("Evidence Guard")
-        otsu_val = spec_res["metrics"].get("otsu_threshold", 48.5)
-        ch_pct = spec_res["metrics"].get("change_pct", 14.82)
-        tracer.end_stage("Evidence Guard", status="pass", summary=f"NDWI flood delta verified (Otsu threshold={otsu_val}, Delta={ch_pct}%)")
+        ev_guard = verify_evidence(
+            file_paths=saved_paths,
+            answer_or_summary=spec_res["answer_or_summary"],
+            query=query_text,
+            task_type="change_detection",
+            specialist_metrics=spec_res["metrics"],
+            specialist_confidence=0.80
+        )
+        tracer.end_stage("Evidence Guard", status="pass", summary=ev_guard["summary"])
 
         # Stage 7: Confidence Engine
         tracer.start_stage("Confidence Engine")
         c_sensor = round(max(0.0, 1.0 - float(primary_meta.get("uncertainty", 0.17))), 2)
-        confidence_data = {
-            "aggregate_score": 0.82,
-            "label": "Moderate Evidence Consistency",
-            "breakdown": {
-                "c_sensor": c_sensor,
-                "c_adapter": 0.80,
-                "c_guard": 0.81,
-                "c_spectral": 0.84
-            },
-            "weights": {
-                "w1_sensor": 0.15,
-                "w2_adapter": 0.35,
-                "w3_guard": 0.25,
-                "w4_spectral": 0.25
-            }
-        }
-        tracer.end_stage("Confidence Engine", status="pass", summary="Aggregate score 0.82 (Moderate Evidence Consistency)")
+        confidence_data = calculate_confidence(
+            c_sensor=c_sensor,
+            c_adapter=0.80,
+            c_guard=ev_guard["c_guard"],
+            c_spectral=ev_guard["c_spectral"]
+        )
+        tracer.end_stage("Confidence Engine", status="pass", summary=f"Aggregate score {confidence_data['aggregate_score']} ({confidence_data['label']})")
 
         response_payload = {
             "status": "success",
             "task_type": "change_detection",
             "fidelity": "reduced",
             "method": "image-differencing-otsu",
+            "query_text": query_text,
             "answer_or_summary": spec_res["answer_or_summary"],
             "visuals": spec_res["visuals"],
             "metrics": spec_res["metrics"],
@@ -564,35 +591,33 @@ async def execute_query(
 
         # Stage 6: Evidence Guard
         tracer.start_stage("Evidence Guard")
-        roughness = spec_res["metrics"].get("roughness_index", 0.76)
-        tracer.end_stage("Evidence Guard", status="pass", summary=f"Dielectric roughness & backscatter verified (Index: {roughness})")
+        ev_guard = verify_evidence(
+            file_paths=saved_paths,
+            answer_or_summary=spec_res["answer_or_summary"],
+            query=query_text,
+            task_type="optical_sar_fusion",
+            specialist_metrics=spec_res["metrics"],
+            specialist_confidence=0.83
+        )
+        tracer.end_stage("Evidence Guard", status="pass", summary=ev_guard["summary"])
 
         # Stage 7: Confidence Engine
         tracer.start_stage("Confidence Engine")
         c_sensor = round(max(0.0, 1.0 - float(primary_meta.get("uncertainty", 0.14))), 2)
-        confidence_data = {
-            "aggregate_score": 0.84,
-            "label": "Moderate Evidence Consistency",
-            "breakdown": {
-                "c_sensor": c_sensor,
-                "c_adapter": 0.83,
-                "c_guard": 0.85,
-                "c_spectral": 0.82
-            },
-            "weights": {
-                "w1_sensor": 0.15,
-                "w2_adapter": 0.35,
-                "w3_guard": 0.25,
-                "w4_spectral": 0.25
-            }
-        }
-        tracer.end_stage("Confidence Engine", status="pass", summary="Aggregate score 0.84 (Moderate Evidence Consistency)")
+        confidence_data = calculate_confidence(
+            c_sensor=c_sensor,
+            c_adapter=0.83,
+            c_guard=ev_guard["c_guard"],
+            c_spectral=ev_guard["c_spectral"]
+        )
+        tracer.end_stage("Confidence Engine", status="pass", summary=f"Aggregate score {confidence_data['aggregate_score']} ({confidence_data['label']})")
 
         response_payload = {
             "status": "success",
             "task_type": "optical_sar_fusion",
             "fidelity": "reduced",
             "method": "band-overlay-heuristic",
+            "query_text": query_text,
             "answer_or_summary": spec_res["answer_or_summary"],
             "visuals": spec_res["visuals"],
             "metrics": spec_res["metrics"],
@@ -614,32 +639,6 @@ async def execute_query(
         vqa_res = _dispatch_vqa_inference(saved_paths[0], query_text)
         tracer.end_stage("VQA Reasoning Engine", status="pass", summary=f"Inference complete ({vqa_res['method']})")
 
-        # Stage 6: Evidence Guard
-        tracer.start_stage("Evidence Guard")
-        tracer.end_stage("Evidence Guard", status="pass", summary="Spectral Otsu agreement IoU=0.88 verified")
-
-        # Stage 7: Confidence Engine
-        tracer.start_stage("Confidence Engine")
-        c_sensor = round(max(0.0, 1.0 - float(primary_meta.get("uncertainty", 0.17))), 2)
-        c_vqa = round(vqa_res.get("confidence", 0.93), 2)
-        confidence_data = {
-            "aggregate_score": 0.89,
-            "label": "High Evidence Consistency",
-            "breakdown": {
-                "c_sensor": c_sensor,
-                "c_adapter": c_vqa,
-                "c_guard": 0.90,
-                "c_spectral": 0.88
-            },
-            "weights": {
-                "w1_sensor": 0.15,
-                "w2_adapter": 0.35,
-                "w3_guard": 0.25,
-                "w4_spectral": 0.25
-            }
-        }
-        tracer.end_stage("Confidence Engine", status="pass", summary="Calculated score 0.89 (High Evidence Consistency)")
-
         # Combine answers
         vqa_ans = vqa_res.get("answer", "")
         if not vqa_ans or "analysis indicates" in vqa_ans.lower():
@@ -649,11 +648,36 @@ async def execute_query(
                 "and moderate vegetation/canopy cover across the northeastern perimeter."
             )
 
+        # Stage 6: Evidence Guard
+        tracer.start_stage("Evidence Guard")
+        ev_guard = verify_evidence(
+            file_paths=saved_paths,
+            answer_or_summary=vqa_ans,
+            query=query_text,
+            task_type="vqa",
+            specialist_metrics=grounding_res["metrics"],
+            specialist_confidence=vqa_res.get("confidence", 0.93)
+        )
+        tracer.end_stage("Evidence Guard", status="pass", summary=ev_guard["summary"])
+
+        # Stage 7: Confidence Engine
+        tracer.start_stage("Confidence Engine")
+        c_sensor = round(max(0.0, 1.0 - float(primary_meta.get("uncertainty", 0.17))), 2)
+        c_vqa = round(vqa_res.get("confidence", 0.93), 2)
+        confidence_data = calculate_confidence(
+            c_sensor=c_sensor,
+            c_adapter=c_vqa,
+            c_guard=ev_guard["c_guard"],
+            c_spectral=ev_guard["c_spectral"]
+        )
+        tracer.end_stage("Confidence Engine", status="pass", summary=f"Calculated score {confidence_data['aggregate_score']} ({confidence_data['label']})")
+
         response_payload = {
             "status": "success",
             "task_type": "vqa",
             "fidelity": vqa_res.get("fidelity", "full"),
             "method": vqa_res.get("method", "vqa_specialist (Qwen2-VL-2B-Instruct QLoRA)"),
+            "query_text": query_text,
             "answer_or_summary": vqa_ans,
             "visuals": grounding_res["visuals"],
             "metrics": grounding_res["metrics"],
@@ -682,3 +706,21 @@ async def execute_query(
     )
 
     return response_payload
+
+
+@app.post("/api/export-pdf")
+@app.post("/export-pdf")
+async def export_pdf(report_data: Dict[str, Any] = Body(...)):
+    """Generates a downloadable ISRO Geospatial Intelligence PDF report."""
+    try:
+        pdf_bytes = generate_pdf_report(report_data)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": "attachment; filename=SatQuery_Evidence_Report.pdf"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
+

@@ -119,6 +119,21 @@ body.isro-theme {
   box-shadow: 0 0 6px var(--status-green);
 }
 
+.status-dot.pulse-cyan {
+  background-color: var(--accent-cyan);
+  box-shadow: 0 0 6px var(--accent-cyan);
+}
+
+.status-dot.pulse-amber {
+  background-color: var(--accent-gold);
+  box-shadow: 0 0 6px var(--accent-gold);
+}
+
+.status-dot.pulse-red {
+  background-color: var(--status-red);
+  box-shadow: 0 0 6px var(--status-red);
+}
+
 .status-label {
   color: var(--text-dim);
 }

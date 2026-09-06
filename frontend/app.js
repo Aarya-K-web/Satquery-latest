@@ -11,6 +11,7 @@ const state = {
   demoCases: [],
   currentBboxEntity: null,
   currentPinEntity: null,
+  lastQueryResponse: null,
   activeVisualData: {
     vqa: { primary: '', overlay: '' },
     change: { primary: '', overlay: '' },
@@ -26,8 +27,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCesiumGlobe();
   initEventListeners();
   await loadDemoCases();
+  await checkHealthTelemetry();
   // Auto-activate Beat 1 on initial load
   activateBeat(1);
+  setInterval(checkHealthTelemetry, 15000);
 });
 
 /**
@@ -296,9 +299,7 @@ function initEventListeners() {
   // PDF Report Download Button
   const pdfBtn = document.getElementById('btn-download-pdf');
   if (pdfBtn) {
-    pdfBtn.addEventListener('click', () => {
-      alert("ISRO EvidenceSwarm Audit Summary Report compiled with cryptographic SHA256 trace verification.");
-    });
+    pdfBtn.addEventListener('click', downloadPdfReport);
   }
 }
 
@@ -576,6 +577,12 @@ async function executeActiveQuery() {
       body: formData
     });
     const data = await res.json();
+    state.lastQueryResponse = data;
+
+    // Dynamically update VQA engine indicator based on execution method
+    if (data.method) {
+      updateVqaStatusFromMethod(data.method);
+    }
 
     hideAllResultCards();
 
@@ -796,3 +803,116 @@ function renderExecutionTrace(traces) {
     </div>
   `).join('');
 }
+
+/**
+ * 13. PDF Intelligence Report Exporter
+ */
+async function downloadPdfReport() {
+  const reportData = state.lastQueryResponse;
+  if (!reportData) {
+    alert("No active query response available to generate report. Please submit an evidence query first.");
+    return;
+  }
+
+  const pdfBtn = document.getElementById('btn-download-pdf');
+  const origHtml = pdfBtn ? pdfBtn.innerHTML : '';
+  if (pdfBtn) {
+    pdfBtn.disabled = true;
+    pdfBtn.innerHTML = `
+      <span class="btn-spinner"></span>
+      <span>COMPILING ISRO INTELLIGENCE REPORT (PDF)...</span>
+    `;
+  }
+
+  try {
+    const res = await fetch('/api/export-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reportData)
+    });
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.detail || `Export failed with HTTP ${res.status}`);
+    }
+
+    const blob = await res.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = blobUrl;
+    const task = reportData.task_type || 'intelligence';
+    a.download = `SatQuery_Report_${task}_${new Date().toISOString().slice(0, 10)}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(blobUrl);
+    a.remove();
+  } catch (err) {
+    console.error('PDF Export Error:', err);
+    alert(`Failed to export PDF report: ${err.message}`);
+  } finally {
+    if (pdfBtn) {
+      pdfBtn.disabled = false;
+      pdfBtn.innerHTML = origHtml;
+    }
+  }
+}
+
+/**
+ * 14. Telemetry & VQA Status Engine
+ */
+async function checkHealthTelemetry() {
+  try {
+    const t0 = performance.now();
+    const res = await fetch('/health');
+    const t1 = performance.now();
+    const latency = Math.round(t1 - t0);
+
+    const latEl = document.getElementById('hud-latency');
+    if (latEl) latEl.textContent = `${latency}ms`;
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.vqa_engine_mode) {
+        updateVqaStatusIndicator(data.vqa_engine_mode);
+      }
+    }
+  } catch (err) {
+    console.debug('Telemetry poll notice:', err);
+  }
+}
+
+function updateVqaStatusFromMethod(methodStr) {
+  const m = (methodStr || '').toLowerCase();
+  if (m.includes('upload') || m.includes('tunnel') || m.includes('remote') || m.includes('ngrok')) {
+    updateVqaStatusIndicator('GPU (Tunnel / Remote)');
+  } else if (m.includes('qwen') || m.includes('qlora') || m.includes('gpu')) {
+    updateVqaStatusIndicator('GPU (Local)');
+  } else if (m.includes('heuristic') || m.includes('cpu') || m.includes('differencing')) {
+    updateVqaStatusIndicator('CPU Fallback');
+  }
+}
+
+function updateVqaStatusIndicator(mode) {
+  const dot = document.getElementById('vqa-status-dot');
+  const text = document.getElementById('vqa-status-text');
+  if (!text || !dot) return;
+
+  const modeStr = (mode || '').toUpperCase();
+  dot.className = 'status-dot';
+
+  if (modeStr.includes('TUNNEL') || modeStr.includes('REMOTE') || modeStr.includes('UPLOAD')) {
+    text.textContent = 'GPU (TUNNEL / REMOTE)';
+    text.style.color = '#00f0ff';
+    dot.classList.add('pulse-cyan');
+  } else if (modeStr.includes('LOCAL') || modeStr.includes('GPU')) {
+    text.textContent = 'GPU (LOCAL)';
+    text.style.color = '#10b981';
+    dot.classList.add('pulse-green');
+  } else {
+    text.textContent = 'CPU FALLBACK';
+    text.style.color = '#ffaa00';
+    dot.classList.add('pulse-amber');
+  }
+}
+
