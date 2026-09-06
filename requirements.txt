@@ -29,7 +29,10 @@ datasets>=3.0.0
 # Fallback if Unsloth unavailable on Windows (uses PEFT fallback)
 # unsloth  # optional - Linux only
 
+# Output Renderer & PDF Generation
+fpdf2>=2.8.0
+
 # Optional / Future phase integrations (CPU-side)
 # sentence-transformers>=2.5.0
 # opencv-python-headless>=4.9.0
-# reportlab>=4.1.0
+

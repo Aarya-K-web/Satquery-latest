@@ -79,14 +79,19 @@ async def serve_index():
 
 
 def get_vqa_engine_mode() -> str:
-    """Detects whether VQA is connected to a GPU tunnel, local GPU, or CPU fallback."""
+    """Detects whether VQA is connected to Modal serverless GPU, GPU tunnel, local GPU, or CPU fallback."""
     vqa_url = os.getenv("VQA_SERVER_URL", "http://127.0.0.1:8001/infer")
+    vqa_url_lower = vqa_url.lower()
+
+    if any(m in vqa_url_lower for m in ["modal.run", "modal.com", "modal"]):
+        return "GPU (Modal Serverless)"
+
     health_url = vqa_url.replace("/infer", "/health")
     try:
         req = urllib.request.Request(health_url, method="GET")
         with urllib.request.urlopen(req, timeout=1.2) as response:
             if response.status == 200:
-                if any(t in vqa_url for t in ["ngrok", "loca.lt", "pinggy", "trycloudflare", "remote", "tailscale"]):
+                if any(t in vqa_url_lower for t in ["ngrok", "loca.lt", "pinggy", "trycloudflare", "remote", "tailscale"]):
                     return "GPU (Tunnel / Remote)"
                 return "GPU (Local)"
     except Exception:
@@ -291,31 +296,40 @@ async def spectral_analysis(
 def _dispatch_vqa_inference(image_path: Path, question: str) -> Dict[str, Any]:
     """
     Attempts VQA inference via GPU Lead endpoint (VQA_SERVER_URL env, default http://127.0.0.1:8001/infer).
-    Tries JSON fast-path (same-machine shared FS), then multipart file upload (same-WiFi remote laptop),
-    then falls back to local heuristic vqa_specialist. Never raises.
+    Optimized dispatch:
+    - Remote endpoints (https://, modal.run, modal.com, ngrok, etc.): Skips JSON fast-path and uploads file via multipart with 25s timeout for serverless cold starts.
+    - Local endpoints (localhost / 127.0.0.1): Tries shared-filesystem JSON fast-path first.
+    - Never raises: Falls back gracefully to heuristic CPU specialist.
     """
     vqa_url = os.getenv("VQA_SERVER_URL", "http://127.0.0.1:8001/infer")
-    # 1) JSON fast-path (local)
-    try:
-        req_body = json.dumps({"image_path": str(image_path), "question": question}).encode("utf-8")
-        req = urllib.request.Request(vqa_url, data=req_body, headers={"Content-Type": "application/json"}, method="POST")
-        with urllib.request.urlopen(req, timeout=8) as response:
-            if response.status == 200:
-                data = json.loads(response.read().decode("utf-8"))
-                if data.get("answer"):
-                    return {
-                        "answer": data.get("answer", ""),
-                        "confidence": float(data.get("confidence", 0.93)),
-                        "fidelity": data.get("fidelity", "full"),
-                        "method": data.get("method", "vqa_specialist (Qwen2-VL-2B-Instruct QLoRA GPU Server)"),
-                    }
-    except Exception:
-        pass
-    # 2) Multipart file upload — required when Backend and GPU laptop are on different machines (same WiFi)
+    vqa_url_lower = vqa_url.lower()
+    is_remote = vqa_url_lower.startswith("https://") or "modal.run" in vqa_url_lower or "modal.com" in vqa_url_lower
+    is_localhost = "127.0.0.1" in vqa_url_lower or "localhost" in vqa_url_lower
+
+    # 1) JSON fast-path (strictly for local shared filesystem)
+    if is_localhost and not is_remote:
+        try:
+            req_body = json.dumps({"image_path": str(image_path), "question": question}).encode("utf-8")
+            req = urllib.request.Request(vqa_url, data=req_body, headers={"Content-Type": "application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=8) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode("utf-8"))
+                    if data.get("answer"):
+                        return {
+                            "answer": data.get("answer", ""),
+                            "confidence": float(data.get("confidence", 0.93)),
+                            "fidelity": data.get("fidelity", "full"),
+                            "method": data.get("method", "vqa_specialist (Qwen2-VL-2B-Instruct QLoRA GPU Server)"),
+                        }
+        except Exception:
+            pass
+
+    # 2) Multipart file upload — required for remote endpoints (Modal/Tunnel) or cross-machine GPU
+    # Timeout 25s accommodates Modal serverless cold starts
     try:
         import requests as _req
         with open(image_path, "rb") as fh:
-            r = _req.post(vqa_url, files={"file": (image_path.name, fh, "image/tiff")}, data={"question": question}, timeout=12)
+            r = _req.post(vqa_url, files={"file": (image_path.name, fh, "image/tiff")}, data={"question": question}, timeout=25)
             if r.status_code == 200:
                 data = r.json()
                 if data.get("answer"):
@@ -327,7 +341,8 @@ def _dispatch_vqa_inference(image_path: Path, question: str) -> Dict[str, Any]:
                     }
     except Exception:
         pass
-    # 3) urllib multipart fallback (no requests)
+
+    # 3) urllib multipart fallback (no requests) with 25s timeout
     try:
         import mimetypes, uuid as _uuid
         boundary = _uuid.uuid4().hex
@@ -341,7 +356,7 @@ def _dispatch_vqa_inference(image_path: Path, question: str) -> Dict[str, Any]:
         body_parts.append(f"--{boundary}--\r\n".encode())
         body = b"".join(body_parts)
         req2 = urllib.request.Request(vqa_url, data=body, headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}, method="POST")
-        with urllib.request.urlopen(req2, timeout=12) as response:
+        with urllib.request.urlopen(req2, timeout=25) as response:
             if response.status == 200:
                 data = json.loads(response.read().decode("utf-8"))
                 if data.get("answer"):
@@ -353,6 +368,8 @@ def _dispatch_vqa_inference(image_path: Path, question: str) -> Dict[str, Any]:
                     }
     except Exception:
         pass
+
+    # 4) Heuristic CPU fallback
     infer_res = vqa_infer(None, image_path, question)
     return {
         "answer": infer_res.get("answer", "Analysis indicates coastal mixed urban and water features."),

@@ -884,7 +884,9 @@ async function checkHealthTelemetry() {
 
 function updateVqaStatusFromMethod(methodStr) {
   const m = (methodStr || '').toLowerCase();
-  if (m.includes('upload') || m.includes('tunnel') || m.includes('remote') || m.includes('ngrok')) {
+  if (m.includes('modal')) {
+    updateVqaStatusIndicator('GPU (Modal Serverless)');
+  } else if (m.includes('upload') || m.includes('tunnel') || m.includes('remote') || m.includes('ngrok')) {
     updateVqaStatusIndicator('GPU (Tunnel / Remote)');
   } else if (m.includes('qwen') || m.includes('qlora') || m.includes('gpu')) {
     updateVqaStatusIndicator('GPU (Local)');
@@ -896,23 +898,44 @@ function updateVqaStatusFromMethod(methodStr) {
 function updateVqaStatusIndicator(mode) {
   const dot = document.getElementById('vqa-status-dot');
   const text = document.getElementById('vqa-status-text');
+  const pill = document.getElementById('vqa-status-pill');
   if (!text || !dot) return;
 
   const modeStr = (mode || '').toUpperCase();
   dot.className = 'status-dot';
 
-  if (modeStr.includes('TUNNEL') || modeStr.includes('REMOTE') || modeStr.includes('UPLOAD')) {
+  if (modeStr.includes('MODAL')) {
+    text.textContent = 'VQA: Modal GPU';
+    text.style.color = '#c084fc';
+    dot.classList.add('pulse-purple');
+    if (pill) {
+      pill.style.borderColor = 'rgba(168, 85, 247, 0.4)';
+      pill.style.background = 'linear-gradient(90deg, rgba(13, 18, 31, 0.9) 0%, rgba(88, 28, 135, 0.25) 100%)';
+    }
+  } else if (modeStr.includes('TUNNEL') || modeStr.includes('REMOTE') || modeStr.includes('UPLOAD')) {
     text.textContent = 'GPU (TUNNEL / REMOTE)';
     text.style.color = '#00f0ff';
     dot.classList.add('pulse-cyan');
+    if (pill) {
+      pill.style.borderColor = '';
+      pill.style.background = '';
+    }
   } else if (modeStr.includes('LOCAL') || modeStr.includes('GPU')) {
     text.textContent = 'GPU (LOCAL)';
     text.style.color = '#10b981';
     dot.classList.add('pulse-green');
+    if (pill) {
+      pill.style.borderColor = '';
+      pill.style.background = '';
+    }
   } else {
     text.textContent = 'CPU FALLBACK';
     text.style.color = '#ffaa00';
     dot.classList.add('pulse-amber');
+    if (pill) {
+      pill.style.borderColor = '';
+      pill.style.background = '';
+    }
   }
 }
 

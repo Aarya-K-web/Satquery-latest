@@ -129,6 +129,11 @@ body.isro-theme {
   box-shadow: 0 0 6px var(--accent-gold);
 }
 
+.status-dot.pulse-purple {
+  background-color: #a855f7;
+  box-shadow: 0 0 6px #a855f7, 0 0 10px rgba(168, 85, 247, 0.5);
+}
+
 .status-dot.pulse-red {
   background-color: var(--status-red);
   box-shadow: 0 0 6px var(--status-red);

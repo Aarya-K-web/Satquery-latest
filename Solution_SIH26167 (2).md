@@ -6,7 +6,7 @@
 **SatQuery EvidenceSwarm — Lean Adaptive Agentic Architecture for Multimodal Remote Sensing Analysis**
 
 ### One-Sentence Description
-A lean, latency-budgeted agentic remote-sensing assistant that runs a fine-tuned Qwen2-VL-2B-Instruct VQA specialist alongside three architecturally-complete reduced-fidelity pipeline paths, cross-checks every claim against both learned grounding and classical spectral physics, and enforces an explicit Evidence Contract to refuse unsupported queries — delivering verified, confidence-calibrated, and auditable satellite insights on an 8GB VRAM laptop.
+A lean, latency-budgeted agentic remote-sensing assistant that runs a fine-tuned Qwen2-VL-2B-Instruct VQA specialist served via serverless GPU alongside three architecturally-complete reduced-fidelity pipeline paths, cross-checks every claim against both learned grounding and classical spectral physics, and enforces an explicit Evidence Contract to refuse unsupported queries — delivering verified, confidence-calibrated, and auditable satellite insights via a resilient split-cloud architecture.
 
 ---
 
@@ -26,7 +26,7 @@ India’s Earth-observation (EO) satellites (Cartosat-2S, RISAT, Sentinel, etc.)
 | **Black-box predictions & lack of auditability** | Generates a **4-Factor Calibrated Confidence Score**, visual evidence overlays, observable execution traces, and downloadable PDF/JSON audit reports. |
 
 ### Unique Value Proposition
-Unlike brittle VLM wrappers that guess when faced with incomplete data, **SatQuery EvidenceSwarm** introduces an **evidence-first execution model**. It defines what must be proven *before* invoking models, cross-verifies neural outputs against independent physical laws (classical spectral indices), and proves trust by explicitly refusing to answer when data is insufficient. Under current hardware and timeline constraints (8GB VRAM, 6-day build), the system delivers one production-quality fine-tuned specialist (VQA) alongside three architecturally-complete reduced-fidelity pipeline paths — a deliberate engineering trade-off that preserves the full agentic framework while concentrating real ML depth where it has the highest evaluation impact.
+Unlike brittle VLM wrappers that guess when faced with incomplete data, **SatQuery EvidenceSwarm** introduces an **evidence-first execution model**. It defines what must be proven *before* invoking models, cross-verifies neural outputs against independent physical laws (classical spectral indices), and proves trust by explicitly refusing to answer when data is insufficient. The system delivers one production-quality fine-tuned specialist (VQA) alongside three architecturally-complete reduced-fidelity pipeline paths — a deliberate engineering trade-off that preserves the full agentic framework while concentrating real ML depth where it has the highest evaluation impact.
 
 ---
 
@@ -66,8 +66,8 @@ Unlike brittle VLM wrappers that guess when faced with incomplete data, **SatQue
 ┌────────────────┐┌────────────────┐┌────────────────┐┌────────────────┐
 │ VQA Specialist ││ Caption /      ││ Bi-Temporal    ││ Optical-SAR    │
 │ [FINE-TUNED]   ││ Grounding      ││ Change         ││ Fusion         │
-│ Qwen2-VL-2B   ││ [REDUCED-      ││ [REDUCED-      ││ [REDUCED-      │
-│ QLoRA          ││  FIDELITY]     ││  FIDELITY]     ││  FIDELITY]     │
+│ Modal GPU Svc  ││ [REDUCED-      ││ [REDUCED-      ││ [REDUCED-      │
+│ Qwen2-VL-2B    ││  FIDELITY]     ││  FIDELITY]     ││  FIDELITY]     │
 └───────┬────────┘└───────┬────────┘└───────┬────────┘└───────┬────────┘
         │                 │                 │                 │
         └─────────────────┴─────────────────┴─────────────────┘
@@ -94,10 +94,10 @@ Unlike brittle VLM wrappers that guess when faced with incomplete data, **SatQue
 2. **Evidence Contract & Refusal Gate**: Acting as an early safety check, this component verifies whether the inputs can physically support the question (e.g., verifying bi-temporal coverage before attempting change analysis). If inputs fail criteria, it triggers a clean refusal with actionable feedback instead of hallucinating.
 3. **Agentic Router**: Uses sentence embeddings and rule overrides to direct queries to the appropriate specialist adapters in under 1 second.
 4. **Specialist Paths**: One fully fine-tuned specialist and three reduced-fidelity pipeline paths:
-   - *VQA Specialist* (**Fully Fine-Tuned**): QLoRA fine-tuned Qwen2-VL-2B-Instruct on BigEarthNet-derived QA data for single-image visual questioning.
-   - *Captioning / Grounding Path* (**Reduced-Fidelity**): Router-dispatched with a rule-based / classical CV placeholder specialist.
-   - *Bi-Temporal Change Path* (**Reduced-Fidelity**): Router-dispatched with an image differencing/thresholding placeholder specialist.
-   - *Optical-SAR Fusion Path* (**Reduced-Fidelity**): Router-dispatched with a basic band-overlay heuristic placeholder specialist.
+   - *VQA Specialist* (**Fully Fine-Tuned**): QLoRA fine-tuned Qwen2-VL-2B-Instruct on BigEarthNet-derived QA data, served on-demand via **Modal (Serverless GPU)**.
+   - *Captioning / Grounding Path* (**Reduced-Fidelity**): Router-dispatched with a rule-based / classical CV placeholder specialist executing on CPU.
+   - *Bi-Temporal Change Path* (**Reduced-Fidelity**): Router-dispatched with an image differencing/thresholding placeholder specialist executing on CPU.
+   - *Optical-SAR Fusion Path* (**Reduced-Fidelity**): Router-dispatched with a basic band-overlay heuristic placeholder specialist executing on CPU.
 5. **Evidence Guard**: Dual verification layer combining neural grounding with classical spectral math (NumPy-based CPU Otsu thresholding for NDWI/NDVI overlap). Applies fully to the VQA path; reduced-fidelity paths receive basic validation only.
 6. **Confidence & Output Engine**: Synthesizes verification outputs into a 4-factor confidence badge, renders map overlays, and exports structured reports.
 
@@ -109,24 +109,23 @@ Unlike brittle VLM wrappers that guess when faced with incomplete data, **SatQue
 
 | Layer | Technology | Rationale |
 |---|---|---|
-| **Backend API** | FastAPI + Uvicorn | Lightweight async model serving and pipeline orchestration |
+| **Backend API & UI** | FastAPI + Uvicorn + Frontend | Lightweight async model serving and pipeline orchestration deployed on cloud web hosting |
 | **Geospatial Processing** | `rasterio`, `GDAL`, `pyproj`, `geopandas` | Industry-standard handling of multi-band GeoTIFFs, CRS reprojection, and spatial masks |
-| **RS-VLM Backbone** | **Qwen2-VL-2B-Instruct** (QLoRA fine-tuned) | Best VRAM headroom (~3–3.5GB on 8GB card), mature QLoRA tooling, native grounding support |
-| **Model Adaptation** | **Unsloth / LLaMA-Factory / Swift** + QLoRA | Most mature fine-tuning tooling for Qwen2-VL; single VQA adapter with maximum iteration room |
-| **Quantization** | `bitsandbytes` (4-bit / 8-bit) | Enables full pipeline execution within an **8GB VRAM** laptop footprint (~3–3.5GB model headroom) |
+| **RS-VLM Backbone** | **Qwen2-VL-2B-Instruct** (QLoRA fine-tuned) | Optimal parameter-to-performance ratio, mature QLoRA tooling, native grounding support |
+| **Model Adaptation** | **Unsloth / LLaMA-Factory / Swift** + QLoRA | Efficient fine-tuning tooling for Qwen2-VL; single VQA adapter maximizing precision |
+| **Quantization** | `bitsandbytes` (4-bit / 8-bit) | Enables low-latency, cost-effective serverless GPU hosting and local fine-tuning footprint |
 | **Agentic Router** | `sentence-transformers` + rule overrides | High-speed, deterministic intent routing with low latency |
 | **Evidence Guard** | Qwen2-VL grounding + CLIP similarity + Otsu NDWI/NDVI | Dual-verification combining neural spatial attention with classical CPU spectral physics |
-| **Storage & Logging** | Local filesystem + SQLite | Zero-dependency local persistence for execution logs and report generation |
-| **Deployment** | Railway/Render (orchestration, CPU-only) + laptop-via-tunnel / Modal/RunPod (GPU inference) | Split architecture driven by 8GB VRAM constraint; serverless GPU is stretch goal |
+| **Storage & Logging** | Local filesystem + SQLite | Zero-dependency persistence for execution logs and report generation |
+| **Deployment** | **Railway / Render** (orchestration & UI) + **Modal** (serverless GPU for VQA) | Resilient split-cloud architecture ensuring public judge URL availability without laptop dependency |
 
 ### Deployment Architecture
 
-The system uses a split deployment model driven by the 8GB VRAM laptop constraint:
+The system uses a split cloud architecture:
 
-- **Orchestration Layer** (CPU-only): GUI, agentic router, and reduced-fidelity placeholder specialists deploy to **Railway or Render** as standard web services.
-- **VQA Model Inference** (GPU-dependent): The fine-tuned Qwen2-VL-2B-Instruct model runs on the **local laptop exposed via tunnel** (ngrok/Cloudflare Tunnel) as the primary plan, requiring no additional cost. A **serverless GPU host** (Modal/RunPod) is a stretch goal only if Day 5–6 buffer time allows.
-
-> **Open item:** Confirm whether the SIH internal round requires a judge-testable public URL or is satisfied by a live local demo — this determines how much buffer time should go toward hardening the tunnel vs. polishing the demo script.
+- **Orchestration Layer** (FastAPI + Frontend + CPU specialists + Agentic Router + Evidence Contract + Evidence Guard + Confidence Engine): Deployed on **Railway / Render** as a persistent, publicly accessible web service.
+- **Fine-Tuned VQA Model Serving**: Served via **Modal (Serverless GPU)** on-demand, executing Qwen2-VL-2B with the fine-tuned QLoRA adapter in an optimized GPU container with fast cold-start handling.
+- **Automatic Fallback & Backup Serving**: Automatic fallback to CPU heuristics / base model if the GPU endpoint is unavailable. Local laptop serving via tunnel (ngrok / Cloudflare Tunnel) is deprecated as a primary presentation path and retained strictly as a development-time or emergency offline backup option.
 
 ---
 
@@ -160,7 +159,7 @@ Aggregated Evidence Score:     0.87  (Labeled: "High Evidence Consistency")
 - **GeoTIFF Upload & Compatibility Validation**: Automated header parsing and spatial alignment check.
 - **Interactive Sensor Card**: Instant display of sensor type, resolution, spectral bands, and sensor uncertainty.
 - **Evidence Contract & Refusal Engine**: Formal constraint check that halts execution with clear explanations on incompatible inputs.
-- **Single-Image VQA & Bounding** *(Fully Fine-Tuned Specialist)*: Spatial grounding for feature identification, powered by QLoRA fine-tuned Qwen2-VL-2B-Instruct on BigEarthNet-derived QA data.
+- **Single-Image VQA & Bounding** *(Fully Fine-Tuned Specialist)*: Spatial grounding for feature identification, powered by QLoRA fine-tuned Qwen2-VL-2B-Instruct on BigEarthNet-derived QA data, served via Modal serverless GPU.
 - **Bi-Temporal Change Detection** *(Reduced-Fidelity Path)*: Architecturally complete pipeline (routed, validated, output-formatted) with a classical CV placeholder specialist (image differencing/thresholding) flagged as reduced-fidelity.
 - **Optical-SAR Fusion Analysis** *(Reduced-Fidelity Path)*: Architecturally complete pipeline with a basic band-overlay heuristic placeholder specialist flagged as reduced-fidelity.
 - **Captioning / Grounding** *(Reduced-Fidelity Path)*: Architecturally complete pipeline with a rule-based / classical CV placeholder specialist flagged as reduced-fidelity.
@@ -173,12 +172,12 @@ Aggregated Evidence Score:     0.87  (Labeled: "High Evidence Consistency")
 ### Nice-to-Have Features (Deferred Post-MVP)
 - **Fast-Draft Mode**: Lower resolution preview option for quick exploratory queries.
 - **Side-by-Side Sensor Comparator**: Visual split-screen comparing raw optical vs. SAR bands.
-- **Session History & Caching**: Local caching of previous query results.
+- **Session History & Caching**: Cloud/Local caching of previous query results.
 
 ### Out of Scope (Future Roadmap)
 - Full vernacular voice-to-text NLU pipeline.
-- Distributed Docker/Kubernetes cluster deployment.
-- Live satellite data API integration.
+- Distributed Kubernetes multi-region cluster deployment.
+- Live satellite data API ingestion stream.
 
 ---
 
@@ -200,20 +199,20 @@ Aggregated Evidence Score:     0.87  (Labeled: "High Evidence Consistency")
 2. **Sensor Inspection**: Sensor Card displays sensor metadata, spatial resolution, and band details.
 3. **Query Submission**: User types a natural language question (e.g., *"Identify flooded agricultural land between these two dates"*).
 4. **Contract Verification**: Evidence Contract validates if uploaded imagery matches query requirements (triggers Refusal Path if invalid).
-5. **Specialist Execution**: Agentic Router invokes required LoRA adapter(s).
+5. **Specialist Execution**: Agentic Router dispatches to Modal GPU VQA specialist or CPU reduced-fidelity specialist.
 6. **Physics Verification**: Evidence Guard runs learned grounding and Otsu NDWI spectral cross-check.
 7. **Result Delivery**: UI renders highlighted overlay, 4-factor confidence badge, execution trace, and downloadable PDF report.
 
 ### 4-Beat Live Demonstration Script
-1. **Beat 1 (Single-Image VQA Baseline)**: Standard object identification and spatial bounding on optical imagery — powered by the fully fine-tuned Qwen2-VL-2B-Instruct VQA specialist.
+1. **Beat 1 (Single-Image VQA Baseline)**: Standard object identification and spatial bounding on optical imagery — powered by the fully fine-tuned Qwen2-VL-2B-Instruct VQA specialist on Modal GPU.
 2. **Beat 2 (Bi-Temporal Change Detection)**: Pre/post-flood analysis generating a pixel-level change mask and confidence report — demonstrates the full agentic pipeline with a reduced-fidelity placeholder specialist (image differencing/thresholding).
 3. **Beat 3 (Optical-SAR Fusion)**: Querying cloud-covered flood zones using combined Sentinel-1 SAR and optical imagery — demonstrates the full agentic pipeline with a reduced-fidelity placeholder specialist (band-overlay heuristic).
 4. **Beat 4 (The Signature Refusal)**: Submitting an incompatible query (e.g., asking for change detection on non-overlapping images). System triggers the Evidence Contract and refuses to answer, demonstrating reliability and trust.
 
 ### 3-Layer Fallback Strategy
-- **Layer 1 (VQA Specialist Fallback)**: If the fine-tuned Qwen2-VL-2B model fails to load, pipeline falls back to the base model with generic prompt templates; reduced-fidelity paths continue operating as designed.
-- **Layer 2 (CPU/Limited GPU Fallback)**: Runs quantization down to 4-bit and processes spectral checks strictly on CPU.
-- **Layer 3 (Video/Pre-rendered Backup)**: Full recorded demo videos of all 4 beats available for live pitch presentation.
+- **Layer 1 (Model / Serverless Endpoint Fallback)**: If the Modal serverless GPU endpoint fails or times out, the orchestration backend automatically catches the exception and falls back to CPU heuristics / base model prompt templates; reduced-fidelity paths continue operating uninterrupted.
+- **Layer 2 (Local Laptop Tunnel / CPU Mode Backup)**: If cloud serverless GPU is degraded during development or emergency situations, traffic can be redirected to a local laptop GPU via tunnel (ngrok / Cloudflare Tunnel) or executed via 4-bit CPU mode.
+- **Layer 3 (Video / Pre-rendered Backup)**: Full recorded high-definition demo videos of all 4 beats available for instant presentation if all network/cloud connections fail.
 
 ---
 
@@ -224,7 +223,7 @@ Aggregated Evidence Score:     0.87  (Labeled: "High Evidence Consistency")
 | **Day 1 — Data Engineering** | • Curate and format BigEarthNet-derived VQA training data.<br>• Implement Input Gate, Sensor Card, and standalone spectral check script. |
 | **Days 2–3 — Fine-Tuning** | • Fine-tune **Qwen2-VL-2B-Instruct** via QLoRA on BigEarthNet-derived VQA data.<br>• Validate VQA specialist on held-out test set.<br>• Implement reduced-fidelity placeholder specialists (classical CV / rule-based). |
 | **Day 4 — Pipeline Integration** | • Wire pipeline end-to-end.<br>• Implement Evidence Contract and Refusal Gate logic.<br>• Lock 4 primary demo test cases. |
-| **Day 5 — Agentic Wiring & Deployment** | • Integrate agentic router with all four pipeline paths.<br>• Set up split deployment (Railway/Render + laptop tunnel).<br>• Integrate Evidence Guard (NDWI/NDVI CPU cross-check). |
+| **Day 5 — Agentic Wiring & Deployment** | • Integrate agentic router with all four pipeline paths.<br>• Deploy main orchestration app to **Railway / Render**.<br>• Deploy fine-tuned VQA specialist to **Modal** serverless GPU.<br>• Integrate Evidence Guard (NDWI/NDVI CPU cross-check). |
 | **Day 6 — Buffer & Polish** | • Polish visual overlays, execution trace display, and PDF exporter.<br>• Perform latency optimization and stress-test refusal paths.<br>• Rehearse 4-beat demo script and record Layer-3 backup videos. |
 
 ---
@@ -237,13 +236,13 @@ Aggregated Evidence Score:     0.87  (Labeled: "High Evidence Consistency")
 | **Spectral Verification Latency Overhead** | Low | Implement spectral index computation as CPU-only parallel NumPy calls so it does not consume GPU execution time. |
 | **Router Misclassification** | Medium | Maintain deterministic rule overrides for key phrasing alongside vector embeddings. |
 | **Refusal Gate Over-Conservatism** | Medium | Provide an admin UI toggle to adjust contract sensitivity thresholds during testing. |
-| **GPU Memory Overhead (OOM)** | High | Use 4-bit `bitsandbytes` quantization to maintain an **≤8GB VRAM** footprint; single VQA adapter eliminates multi-adapter memory contention. |
-| **Live Pitch System Failure** | High | Enforce 3-layer fallback hierarchy ending in recorded high-definition demo clips. |
+| **GPU Memory Overhead (OOM)** | High | Use 4-bit `bitsandbytes` quantization on Modal serverless GPU; single VQA adapter eliminates multi-adapter contention. |
+| **Live Pitch System / Cloud Failure** | High | Enforce 3-layer fallback hierarchy (Modal primary → local tunnel/CPU fallback → recorded HD demo clips). |
 
 ---
 
 ## 11. Strategic Summary: Key Execution Priorities
 
-1. **VQA Fine-Tuning**: Begin **Qwen2-VL-2B-Instruct** QLoRA fine-tuning on BigEarthNet-derived VQA data immediately (Days 1–3).
-2. **Contract & Refusal Testing**: Validate the Evidence Contract and Otsu NDWI/NDVI spectral cross-check scripts on 5–10 real image pairs.
-3. **Demo Practice**: Script, verify, and record all 4 demo beats early to ensure zero-downtime presentation during evaluation.
+1. **VQA Fine-Tuning & Modal Packaging**: Fine-tune **Qwen2-VL-2B-Instruct** with QLoRA on BigEarthNet QA data and package the model onto **Modal** serverless GPU for resilient cloud inference.
+2. **Contract & Refusal Testing**: Validate the Evidence Contract and Otsu NDWI/NDVI spectral cross-check scripts on real image pairs to guarantee zero hallucinations.
+3. **Cloud Deployment & Demo Practice**: Deploy the orchestration layer on Railway/Render connected to Modal, verify automatic fallback, and record all 4 demo beats early to ensure a flawless pitch.

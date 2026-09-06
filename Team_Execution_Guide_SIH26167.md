@@ -1,6 +1,7 @@
 # Team Execution Guide — SIH26167 SatQuery EvidenceSwarm
 ### Role-Based Phase-by-Phase Playbook
 **Derived from:** Execution_Plan_SIH26167.md & Solution_SIH26167 (2).md
+**Deployment Strategy:** Railway / Render (Main Orchestration App) + Modal (Serverless GPU for VQA Specialist)
 **Date:** September 2, 2026
 
 ---
@@ -9,10 +10,10 @@
 
 | Role | Label | Hardware | Scope |
 |---|---|---|---|
-| 🔴 **GPU Lead** | `GPU` | 8GB VRAM laptop (the only GPU machine) | Model fine-tuning, VQA inference, tunnel serving, all GPU-dependent work |
-| 🔵 **Backend Dev(s)** | `BACK` | CPU-only laptop(s) — 1 or 2 people | FastAPI backend, agentic router, Evidence Contract, Evidence Guard, placeholder specialists, API wiring |
-| 🟢 **Frontend Dev** | `FRONT` | CPU-only laptop | UI/UX — upload flow, Sensor Card display, results rendering, confidence badge, PDF download |
-| 🟡 **Flex / QA** | `FLEX` | CPU-only laptop | Data sourcing, test images, integration testing, demo prep, documentation, pitch support, fills gaps |
+| 🔴 **GPU Lead** | `GPU` | 8GB VRAM laptop | Model fine-tuning, adapter validation, Modal serverless GPU packaging & deployment (`modal_vqa.py`), response formatting & cold-start optimization, local test server / tunnel backup |
+| 🔵 **Backend Dev(s)** | `BACK` | CPU-only laptop(s) — 1 or 2 people | FastAPI backend, agentic router, Evidence Contract, Evidence Guard, placeholder specialists, Railway/Render deployment, Modal API integration (`VQA_SERVER_URL`), automatic fallback logic |
+| 🟢 **Frontend Dev** | `FRONT` | CPU-only laptop | UI/UX — upload flow, Sensor Card display, results rendering, confidence badge, PDF download, public cloud endpoint integration |
+| 🟡 **Flex / QA** | `FLEX` | CPU-only laptop | Data sourcing, test images, integration testing, demo prep, documentation, Layer-3 backup demo video recording (all 4 beats), pitch support |
 
 > **Communication rule:** At the end of every phase, all four roles sync up, demo their deliverables to each other, and confirm the phase exit checklist before moving on.
 
@@ -32,8 +33,9 @@ src/
 ├── output_renderer.py           ← BACK + FRONT (collaborate)
 ├── spectral_check.py            ← BACK
 ├── trace_logger.py              ← BACK
+├── vqa_server.py                ← GPU (local dev test server / backup)
 └── specialists/
-    ├── vqa_specialist.py        ← GPU
+    ├── vqa_specialist.py        ← GPU + BACK (calls Modal with local fallback)
     ├── caption_grounding.py     ← BACK
     ├── change_detection.py      ← BACK
     └── optical_sar_fusion.py    ← BACK
@@ -50,11 +52,12 @@ demo/
 ├── images/                      ← FLEX
 ├── demo_cases.json              ← FLEX
 ├── speaker_notes.md             ← FLEX
-└── backup_beat*.mp4             ← FLEX + GPU
+└── backup_beat*.mp4             ← FLEX + GPU (critical safety net)
 
 deploy/
-├── Dockerfile                   ← BACK
-└── tunnel_config.yml            ← GPU
+├── Dockerfile                   ← BACK (for Railway / Render)
+├── modal_vqa.py                 ← GPU (Modal serverless GPU endpoint)
+└── tunnel_config.yml            ← GPU (dev / emergency backup only)
 
 frontend/                        ← FRONT
 ```
@@ -248,7 +251,7 @@ frontend/                        ← FRONT
 - [ ] Refusal display component designed (red/warning styling)
 - [ ] Reduced-fidelity badge component designed
 - [ ] UI runs locally and looks polished
-- [ ] **Interface contract agreed with Backend:** What JSON shapes will the backend send? Agree on the response schema now.
+- [ ] **Interface contract agreed with Backend:** Agree on the JSON response schema now.
 
 ---
 
@@ -262,7 +265,7 @@ frontend/                        ← FRONT
 1. Find and download the following (all must be free/public):
    - 2–3 **Sentinel-2 optical** tiles (different regions — urban, agricultural, water body)
    - 1 **Sentinel-1 SAR** tile (co-registered with one of the optical tiles if possible)
-   - 1 **Pre/post-event Sentinel-2 pair** (e.g., before/after a flood, fire, or urban expansion — check Copernicus Open Access Hub)
+   - 1 **Pre/post-event Sentinel-2 pair** (e.g., before/after a flood, fire, or urban expansion)
    - 1 **Cartosat-2S sample** or **RISAT sample** (if publicly available — for domain shift testing)
    - 1 **Intentionally bad file** — PNG renamed to .tif, or a corrupt file (for refusal testing)
 2. Save to `demo/images/` with clear naming:
@@ -339,31 +342,13 @@ frontend/                        ← FRONT
    ├── frontend/
    └── requirements.txt
    ```
-2. Initialize `requirements.txt` with all known dependencies:
-   ```
-   fastapi
-   uvicorn
-   rasterio
-   GDAL
-   pyproj
-   geopandas
-   numpy
-   sentence-transformers
-   transformers
-   bitsandbytes
-   accelerate
-   peft
-   torch
-   Pillow
-   fpdf2
-   gradio
-   ```
+2. Initialize `requirements.txt` and `requirements-cpu.txt` with dependencies.
 
 ### 📋 Phase 1 Deliverables for Flex:
 - [ ] `demo/images/` — at least 6 test GeoTIFFs sourced and organized
 - [ ] `demo/demo_cases.json` — 4 demo beat cases defined
 - [ ] Project folder structure created in shared repo
-- [ ] `requirements.txt` — complete dependency list
+- [ ] `requirements.txt` & `requirements-cpu.txt` created
 - [ ] 20+ QA pairs spot-checked and verified for GPU Lead's dataset
 - [ ] Pre/post event image pair confirmed to have overlapping spatial extent
 
@@ -377,7 +362,7 @@ Before moving to Phase 2, the team meets and confirms:
 - [ ] Backend: Input Gate + Sensor Card + Spectral Check all working ✅
 - [ ] Frontend: Upload UI + Sensor Card display working with mock data ✅
 - [ ] Flex: Test images sourced, demo cases drafted, repo structured ✅
-- [ ] **API contract agreed**: Backend and Frontend have agreed on the exact JSON shapes for Sensor Card and query responses
+- [ ] **API contract agreed**: Backend and Frontend agree on response schemas
 
 ---
 ---
@@ -388,65 +373,38 @@ Before moving to Phase 2, the team meets and confirms:
 
 ## 🔴 GPU Lead — Phase 2
 
-**Your mission:** Fine-tune Qwen2-VL-2B to become the VQA specialist. This is the single most critical task in the entire project — the PS explicitly requires a fine-tuned RS model.
+**Your mission:** Fine-tune Qwen2-VL-2B to become the VQA specialist.
 
 ### Step-by-step:
 
 **Step 1 — Set up fine-tuning script**
-1. Install Unsloth: `pip install unsloth`
-   - If Unsloth fails on your setup, fallback to LLaMA-Factory or Swift
+1. Install Unsloth: `pip install unsloth` (or fallback to LLaMA-Factory / Swift).
 2. Write `scripts/finetune_vqa.py`:
    - Load base model in 4-bit via `bitsandbytes`
    - Configure LoRA: `r=8`, `lora_alpha=16`, target attention modules
-   - Set training args:
-     - `learning_rate=2e-4`
-     - `per_device_train_batch_size=1`
-     - `gradient_accumulation_steps=4`
-     - `num_train_epochs=3`
-     - `max_seq_length=2048`
-     - `save_steps=500`
-     - `output_dir="models/qwen2vl_vqa_lora"`
-3. **Dry run first**: Train on 10 samples only. Confirm:
-   - No OOM
-   - Loss is printed and decreasing
-   - VRAM stays ≤ 7.5GB
-   - Checkpoint saves correctly
+   - Set training args: `learning_rate=2e-4`, `per_device_train_batch_size=1`, `gradient_accumulation_steps=4`, `num_train_epochs=3`, `max_seq_length=2048`, `output_dir="models/qwen2vl_vqa_lora"`
+3. **Dry run first**: Train on 10 samples to confirm no OOM and loss decreases.
 
 **Step 2 — Full training run**
 1. Launch full training on `data/vqa_train.jsonl`.
-2. Monitor every 30 minutes: check loss curve, VRAM usage, disk space.
-3. If OOM occurs:
-   - First try: `gradient_accumulation_steps=8`
-   - Second try: `max_seq_length=1024`
-   - Last resort: subsample training data to 3,000 pairs
-4. Training will likely take several hours — use this time to write `src/specialists/vqa_specialist.py` (the inference wrapper).
+2. Monitor training loss, validation loss, and GPU memory.
+3. Save checkpoints and final weights in `models/qwen2vl_vqa_lora/`.
 
 **Step 3 — Write VQA inference wrapper**
 1. While training runs, write `src/specialists/vqa_specialist.py`:
    - `load_model()` → loads base model + fine-tuned LoRA adapter
    - `infer(image_path, question)` → `{"answer": str, "confidence": float, "grounding": optional, "fidelity": "full"}`
-   - Handle errors gracefully — if model fails to load, return a fallback response using the base model
-2. Make sure this module can be imported by the Backend team's FastAPI app.
+   - Provide clean error handling and base model fallback.
 
 **Step 4 — Validate fine-tuned model**
-1. Load the fine-tuned adapter.
-2. Run inference on all 50–100 held-out test samples.
-3. Compute accuracy (exact match or semantic similarity).
-4. **Compare against base model** (no fine-tuning) on the same test set.
-5. Write `results/vqa_eval_report.md`:
-   - Table: base model accuracy vs. fine-tuned accuracy
-   - 5 qualitative examples (image + question + base answer + fine-tuned answer)
-   - Inference latency per sample
+1. Load fine-tuned adapter and run inference on 50–100 held-out test samples.
+2. Compute metrics (accuracy, semantic similarity, grounding IoU).
+3. **Compare against base model** on the same test set.
+4. Write `results/vqa_eval_report.md` with comparative metrics and 5 qualitative examples.
 
 **Step 5 — Package for Backend integration**
-1. Confirm `vqa_specialist.py` works as a standalone module:
-   ```python
-   from src.specialists.vqa_specialist import load_model, infer
-   model = load_model()
-   result = infer(model, "demo/images/sentinel2_urban.tif", "What is visible?")
-   print(result)
-   ```
-2. Share this interface spec with Backend so they can integrate it.
+1. Confirm `vqa_specialist.py` works as a standalone module.
+2. Share interface spec with Backend team.
 
 ### 📋 Phase 2 Deliverables for GPU Lead:
 - [ ] `scripts/finetune_vqa.py` — working fine-tuning script
@@ -454,212 +412,73 @@ Before moving to Phase 2, the team meets and confirms:
 - [ ] Fine-tuned model outperforms base model on held-out test set
 - [ ] `src/specialists/vqa_specialist.py` — inference wrapper with clean API
 - [ ] `results/vqa_eval_report.md` — metrics + qualitative examples
-- [ ] Inference latency ≤ 8 seconds per query on your GPU
-- [ ] Interface spec shared with Backend team
+- [ ] Inference latency ≤ 8 seconds per query locally
 
 ---
 
 ## 🔵 Backend Dev(s) — Phase 2
 
-**Your mission:** Build the three reduced-fidelity placeholder specialists. These are CPU-only and don't need a GPU. Each must return structured output with a `"fidelity": "reduced"` flag.
-
-> *If there are 2 of you:* B1 takes Caption/Grounding + Change Detection, B2 takes Optical-SAR Fusion + starts the FastAPI skeleton (head start for Phase 3).
+**Your mission:** Build the three reduced-fidelity placeholder specialists (CPU-only).
 
 ### Step-by-step:
 
 **Step 1 — Captioning / Grounding placeholder (`src/specialists/caption_grounding.py`)**
-1. Write the module:
-   - `run(image_path, query)` → `dict`
-   - Logic:
-     - Open image with `rasterio`, compute band statistics (mean, std per band).
-     - Determine dominant features from statistics (e.g., high NIR = vegetation, high blue = water).
-     - Generate template caption:
-       ```
-       "This {resolution}m {sensor_type} image covers an area of approximately {area_km2} km².
-       Band analysis suggests {dominant_feature_description}."
-       ```
-     - For grounding: run simple edge/contour detection (OpenCV `findContours`) → return bounding boxes of largest regions.
-   - Return:
-     ```json
-     {
-       "caption": "This 10m Sentinel-2 image covers approximately 12 km². Band analysis suggests dominant vegetation with scattered urban patches.",
-       "regions": [{"bbox": [10, 20, 200, 300], "label": "region_1"}],
-       "fidelity": "reduced",
-       "method": "rule-based"
-     }
-     ```
+1. Write module: compute band statistics, generate template caption, extract simple contours for bounding boxes, return `fidelity: reduced`.
 
 **Step 2 — Change Detection placeholder (`src/specialists/change_detection.py`)**
-1. Write the module:
-   - `run(image_path_pre, image_path_post, query)` → `dict`
-   - Logic:
-     - Load both images with `rasterio`.
-     - If CRS or extent differs, reproject/clip to overlap region.
-     - Compute pixel-wise absolute difference (use a representative band or average of RGB).
-     - Apply Otsu thresholding (`spectral_check.otsu_threshold`) to get binary change mask.
-     - Calculate: `change_pct = changed_pixels / total_pixels * 100`
-   - Return:
-     ```json
-     {
-       "change_mask": "<base64 encoded PNG>",
-       "change_pct": 14.7,
-       "summary": "Approximately 14.7% of the overlapping area shows detectable change.",
-       "fidelity": "reduced",
-       "method": "image-differencing"
-     }
-     ```
+1. Write module: load pre/post images, compute absolute difference, apply Otsu thresholding for binary change mask, compute `change_pct`, return `fidelity: reduced`.
 
 **Step 3 — Optical-SAR Fusion placeholder (`src/specialists/optical_sar_fusion.py`)**
-1. Write the module:
-   - `run(optical_path, sar_path, query)` → `dict`
-   - Logic:
-     - Load both images, co-register if CRS differs.
-     - Normalize both to 0–1 range.
-     - Create composite: take RGB from optical, use SAR backscatter as intensity/alpha overlay.
-     - Generate summary from SAR statistics: high backscatter = rough surface/urban, low = smooth/water.
-   - Return:
-     ```json
-     {
-       "composite": "<base64 encoded PNG>",
-       "summary": "SAR backscatter indicates high surface roughness in the northern region, consistent with urban structures. The southern region shows low backscatter, suggesting smooth surfaces or water.",
-       "fidelity": "reduced",
-       "method": "band-overlay-heuristic"
-     }
-     ```
+1. Write module: load optical and SAR images, create composite overlay (RGB + SAR intensity), summarize surface roughness from backscatter, return `fidelity: reduced`.
 
 **Step 4 — Verify all three work with Flex's test images**
-1. Run each specialist against the images in `demo/images/`.
-2. Confirm all return valid structured JSON with `fidelity: reduced`.
-3. Confirm all run on CPU only — no GPU calls.
+1. Run each against `demo/images/` and confirm valid structured output on CPU.
 
-**Step 5 (if 2 people — B2 head start) — FastAPI skeleton**
-1. Start writing `src/app.py` (the main backend application).
-2. Set up `GET /health` endpoint.
-3. Stub out `POST /query` and `GET /sensor-card` endpoints with placeholder responses.
-4. This gives Phase 3 a head start.
+**Step 5 — FastAPI skeleton head start**
+1. Start `src/app.py` with `/health`, `/sensor-card`, `/query` endpoint stubs.
 
 ### 📋 Phase 2 Deliverables for Backend:
 - [ ] `src/specialists/caption_grounding.py` — working, returns structured JSON
 - [ ] `src/specialists/change_detection.py` — working, returns change mask + percentage
 - [ ] `src/specialists/optical_sar_fusion.py` — working, returns composite + summary
-- [ ] All three return `"fidelity": "reduced"` in their output
-- [ ] All three run on CPU only
-- [ ] All three tested against `demo/images/` files
-- [ ] (Bonus) FastAPI skeleton started
+- [ ] All three return `"fidelity": "reduced"` and run on CPU only
+- [ ] FastAPI skeleton started
 
 ---
 
 ## 🟢 Frontend Dev — Phase 2
 
-**Your mission:** Build out the results display components. By the end of Phase 2, the UI should be able to render every possible output type — even if you're still using mock data.
+**Your mission:** Build out the results display components to render all output types.
 
 ### Step-by-step:
-
-**Step 1 — VQA results display**
-1. Build a component that shows:
-   - Answer text (large, prominent)
-   - Image with overlay/bounding boxes (grounding visualization)
-   - Confidence score badge (colored: green ≥ 0.85, yellow 0.65–0.84, red < 0.65)
-2. Use mock data:
-   ```json
-   {
-     "answer": "Urban fabric and arable land are visible, with a water body in the southeast.",
-     "confidence": 0.87,
-     "confidence_label": "High Evidence Consistency",
-     "fidelity": "full"
-   }
-   ```
-
-**Step 2 — Change detection results display**
-1. Build a component that shows:
-   - Change mask image (binary mask overlaid on the pre-image)
-   - Change percentage (large number, e.g., "14.7% changed")
-   - Summary text
-   - Reduced-fidelity badge: "⚠ Reduced-Fidelity: Image Differencing"
-2. Use mock data.
-
-**Step 3 — Optical-SAR fusion results display**
-1. Build a component that shows:
-   - Fused composite image
-   - Summary text
-   - Reduced-fidelity badge: "⚠ Reduced-Fidelity: Band Overlay"
-2. Use mock data.
-
-**Step 4 — Execution trace accordion**
-1. Build a collapsible/accordion component that shows the execution trace:
-   ```
-   [1] Input Gate          ✅ Passed  (0.3s)  — Sentinel-2, 10m, EPSG:32643
-   [2] Evidence Contract   ✅ Passed  (0.1s)  — Single-image VQA compatible
-   [3] Agentic Router      ✅ Routed  (0.2s)  — Task: vqa (confidence: 0.94)
-   [4] VQA Specialist      ✅ Done    (4.2s)  — Answer generated
-   [5] Evidence Guard      ✅ Passed  (0.8s)  — Guard: 0.91, Spectral: 0.86
-   [6] Confidence Engine   ✅ Done    (0.1s)  — Score: 0.87 (High)
-   ```
-2. Use mock trace data for now.
-
-**Step 5 — PDF download button**
-1. Add a "Download Report" button.
-2. For now it can be disabled or download a placeholder PDF.
-3. The actual PDF generation will come from Backend in Phase 4.
+1. **VQA results display**: Answer text, bounding box overlay, colored confidence badge.
+2. **Change detection results display**: Change mask overlay, change percentage badge, reduced-fidelity warning.
+3. **Optical-SAR fusion results display**: Composite image, roughness summary, reduced-fidelity warning.
+4. **Execution trace accordion**: Collapsible view of pipeline stages and timestamps.
+5. **PDF download button**: UI action hook ready for backend integration.
 
 ### 📋 Phase 2 Deliverables for Frontend:
-- [ ] VQA results display — answer, overlay, confidence badge
-- [ ] Change detection results display — mask, percentage, reduced-fidelity badge
-- [ ] Optical-SAR fusion results display — composite, summary, reduced-fidelity badge
-- [ ] Execution trace accordion — renders mock trace data
-- [ ] PDF download button (placeholder)
-- [ ] All components render with mock data and look polished
-- [ ] **Agreed response JSON schema** with Backend documented in `docs/api_schema.md`
+- [ ] All result display components rendering with mock data
+- [ ] Reduced-fidelity badge implemented
+- [ ] Execution trace accordion built
+- [ ] API schema agreement documented
 
 ---
 
 ## 🟡 Flex / QA — Phase 2
 
-**Your mission:** Test everything that's being built, prepare the integration test harness, and start on documentation.
+**Your mission:** Test all specialist modules, review eval reports, and prepare the integration test harness.
 
 ### Step-by-step:
-
-**Step 1 — Test placeholder specialists**
-1. As Backend delivers each specialist, run it against all relevant test images:
-   - Caption/Grounding → run on each single-image GeoTIFF
-   - Change Detection → run on the pre/post flood pair
-   - Optical-SAR Fusion → run on the optical + SAR pair
-2. Log results: does the output make sense? Is the JSON valid? Is `fidelity: reduced` present?
-3. Report bugs/issues to Backend immediately.
-
-**Step 2 — Review GPU Lead's eval results**
-1. When GPU Lead finishes fine-tuning validation, review `results/vqa_eval_report.md`.
-2. Check: does the fine-tuned model clearly beat the base model?
-3. Verify the 5 qualitative examples are sensible.
-
-**Step 3 — Write integration test harness**
-1. Create `tests/test_integration.py`:
-   - This will be used in Phase 3 to test the full pipeline.
-   - For now, write test function stubs for each demo beat:
-     ```python
-     def test_beat1_vqa(): pass  # Fill in Phase 3
-     def test_beat2_change(): pass
-     def test_beat3_fusion(): pass
-     def test_beat4_refusal(): pass
-     ```
-2. Write helper functions: `load_test_image()`, `send_query()`, `validate_response_schema()`.
-
-**Step 4 — Start pitch preparation**
-1. Create `demo/speaker_notes.md` with a skeleton:
-   - Beat 1 intro → what we'll show → expected output → key talking point
-   - Beat 2 intro → what we'll show → note reduced-fidelity → talking point
-   - Beat 3 intro → what we'll show → note reduced-fidelity → talking point
-   - Beat 4 intro → why this matters → refusal demonstrates trust
-2. Start drafting the "scope-reduction framing" slide content:
-   - "Working agentic architecture with one production-quality specialist and three architecturally-complete reduced-fidelity paths"
-   - "Deliberate engineering trade-off under 8GB VRAM / 6-day constraints"
+1. Test all 3 placeholder specialists against real images; report edge cases.
+2. Review GPU Lead's `results/vqa_eval_report.md` to confirm fine-tuning lift.
+3. Write `tests/test_integration.py` test stubs for the 4 demo beats.
+4. Draft pitch outline and speaker notes in `demo/speaker_notes.md`.
 
 ### 📋 Phase 2 Deliverables for Flex:
-- [ ] All 3 placeholder specialists tested against real images, bugs reported
-- [ ] GPU Lead's eval report reviewed and confirmed
-- [ ] `tests/test_integration.py` — stubs ready for Phase 3
-- [ ] `demo/speaker_notes.md` — skeleton with all 4 beats outlined
-- [ ] Scope-reduction framing text drafted
+- [ ] Placeholder specialists verified
+- [ ] `tests/test_integration.py` harness ready
+- [ ] `demo/speaker_notes.md` initial draft completed
 
 ---
 
@@ -667,9 +486,8 @@ Before moving to Phase 2, the team meets and confirms:
 
 - [ ] GPU Lead: VQA specialist fine-tuned and validated ✅
 - [ ] Backend: All 3 placeholder specialists working ✅
-- [ ] Frontend: All result display components rendering with mock data ✅
-- [ ] Flex: Everything tested, integration harness ready ✅
-- [ ] **Key question resolved:** Does VQA inference latency fit within budget? If not, what adjustments?
+- [ ] Frontend: All UI components rendering mock data ✅
+- [ ] Flex: Test harness and speaker notes prepared ✅
 
 ---
 ---
@@ -680,188 +498,99 @@ Before moving to Phase 2, the team meets and confirms:
 
 ## 🔴 GPU Lead — Phase 3
 
-**Your mission:** Make your VQA specialist callable as an API endpoint so the Backend can integrate it. Help test the full pipeline.
+**Your mission:** Make your VQA specialist callable via an HTTP endpoint for local development integration and prepare it for Modal serverless deployment.
 
 ### Step-by-step:
 
-**Step 1 — VQA inference endpoint**
-1. Write a lightweight FastAPI app `src/vqa_server.py` that runs on your GPU laptop:
-   - `POST /infer` — accepts image (file upload) + question (string) → returns VQA result
-   - Loads the fine-tuned model once on startup, keeps it in memory
-   - Returns the same JSON format as `vqa_specialist.py`
-2. Test it locally: `uvicorn src.vqa_server:app --port 8001`
-3. Confirm Backend can call this endpoint from their laptop over the local network (same WiFi).
+**Step 1 — Local VQA inference endpoint (`src/vqa_server.py`)**
+1. Write a lightweight FastAPI app `src/vqa_server.py` that runs on your local GPU:
+   - `POST /infer` — accepts image file + query string → returns VQA JSON.
+   - Loads base model + LoRA adapter in 4-bit on startup.
+2. Test locally: `uvicorn src.vqa_server:app --port 8001`.
+3. Confirm Backend can call this endpoint over the local network during integration.
 
-**Step 2 — Help test full pipeline**
-1. When Backend has the end-to-end pipeline wired, test all 4 demo beats through it.
-2. Specifically verify that the VQA path goes through the full chain: Input Gate → Contract → Router → your VQA model → Evidence Guard → Confidence → Output.
-3. Check inference latency and report back.
+**Step 2 — Help test full pipeline integration**
+1. Verify that incoming queries from the main pipeline invoke the VQA model and receive valid grounded answers.
+2. Benchmark local inference latency and log baseline metrics.
 
 ### 📋 Phase 3 Deliverables for GPU Lead:
-- [ ] `src/vqa_server.py` — VQA inference accessible via HTTP endpoint
-- [ ] Backend can call your endpoint and get VQA responses
-- [ ] Full pipeline tested with your VQA model in the loop
+- [ ] `src/vqa_server.py` — local VQA HTTP server functional
+- [ ] Backend able to query local VQA endpoint
+- [ ] Full pipeline tested end-to-end with VQA model in the loop
 
 ---
 
 ## 🔵 Backend Dev(s) — Phase 3
 
-**Your mission:** This is your biggest phase. Wire everything into a working end-to-end pipeline.
+**Your mission:** Wire every component into a unified end-to-end FastAPI pipeline with the Evidence Contract and trace logging.
 
 ### Step-by-step:
 
-**Step 1 — FastAPI application (`src/app.py`)**
-1. Complete the FastAPI app:
-   - `POST /query` — the main pipeline endpoint
-   - `GET /sensor-card` — returns Sensor Card for an uploaded image
-   - `GET /health` — liveness check
-2. Implement the full pipeline inside `POST /query`:
-   ```
-   Image(s) + Query
-       ↓
-   input_gate.validate_geotiff()
-       ↓
-   sensor_card.generate_card()
-       ↓
-   evidence_contract.check()         ←── if fails, return refusal immediately
-       ↓
-   agentic_router.classify()         ←── for now, use keyword-based routing (full router in Phase 4)
-       ↓
-   specialist.run()                  ←── dispatch to VQA (via GPU Lead's endpoint) or placeholder
-       ↓
-   evidence_guard.check()            ←── for now, just run spectral check
-       ↓
-   confidence_engine.compute()       ←── for now, use simple average
-       ↓
-   Return JSON response
-   ```
+**Step 1 — Implement `/query` pipeline in `src/app.py`**
+1. Wire sequence: Input Gate → Sensor Card → Evidence Contract → Router → Specialist → Evidence Guard → Confidence Engine → Response.
+2. Implement `GET /sensor-card` and `GET /health`.
 
 **Step 2 — Evidence Contract (`src/evidence_contract.py`)**
-1. Implement fully:
-   - `check(query, images_metadata, router_result)` → `{"status": "pass" | "refused", "reason": str, "suggestion": str}`
-   - Rules:
-     - Change detection requires 2 images with overlapping extent → else refuse
-     - Optical-SAR fusion requires 1 optical + 1 SAR → else refuse
-     - VQA/Captioning requires at least 1 valid image → else refuse
-2. Write tests: `tests/test_evidence_contract.py`
+1. Enforce strict pre-flight validation rules:
+   - Bi-temporal change requires 2 overlapping images → else refuse with clear guidance.
+   - Optical-SAR fusion requires 1 optical + 1 SAR image → else refuse.
+   - Single-image VQA requires valid optical imagery → else refuse.
+2. Write unit tests in `tests/test_evidence_contract.py`.
 
 **Step 3 — Trace Logger (`src/trace_logger.py`)**
-1. Build execution trace logging:
-   - Each pipeline stage logs: `{stage_name, status, duration_ms, input_summary, output_summary}`
-   - Store in SQLite: `data/traces.db`
-   - Return the full trace array as part of the `/query` response
-2. Frontend will display this in the execution trace accordion.
+1. Record timestamp, stage name, duration, and status for each pipeline step into SQLite (`data/traces.db`).
+2. Include trace in `/query` JSON response.
 
-**Step 4 — Temporary router (keyword-based)**
-1. Write a simple keyword-based router in `src/agentic_router.py` (placeholder for Phase 4's full router):
-   - "change" / "difference" / "before after" → `change_detection`
-   - "SAR" / "radar" / "backscatter" → `optical_sar_fusion`
-   - "caption" / "describe" / "grounding" → `caption_grounding`
-   - Everything else → `vqa`
-2. This lets you test the full pipeline now; Phase 4 will add the sentence-transformer classifier.
-
-**Step 5 — Test all 4 demo cases end-to-end**
-1. Run each demo case from `demo/demo_cases.json` through the API.
-2. Verify correct routing, correct specialist invocation, correct response format.
-3. Verify Beat 4 triggers a clean refusal.
+**Step 4 — Test all 4 demo cases end-to-end**
+1. Run `demo/demo_cases.json` queries through the API and verify all outputs (including the Beat 4 signature refusal).
 
 ### 📋 Phase 3 Deliverables for Backend:
-- [ ] `src/app.py` — FastAPI app with `/query`, `/sensor-card`, `/health` endpoints
-- [ ] `src/evidence_contract.py` — all refusal scenarios working
-- [ ] `src/trace_logger.py` — execution trace logged to SQLite
-- [ ] Temporary keyword router dispatches correctly
-- [ ] All 4 demo beats work end-to-end through the API
-- [ ] Response JSON matches the schema agreed with Frontend
-- [ ] `tests/test_evidence_contract.py` — all tests pass
+- [ ] `src/app.py` — fully functioning API
+- [ ] `src/evidence_contract.py` — all refusal rules working
+- [ ] `src/trace_logger.py` — SQLite execution trace logging
+- [ ] All 4 demo beats working through the API
 
 ---
 
 ## 🟢 Frontend Dev — Phase 3
 
-**Your mission:** Connect the UI to the real backend API. Replace all mock data with live API calls.
+**Your mission:** Connect UI to the live backend API and replace mock data with real responses.
 
 ### Step-by-step:
-
-**Step 1 — Connect to Backend API**
-1. Replace mock data with real API calls to Backend's FastAPI server.
-2. Upload flow: upload file(s) → call `/sensor-card` → display real Sensor Card.
-3. Query flow: submit query → call `/query` → display real results.
-
-**Step 2 — Handle all response types**
-1. Detect `fidelity` field in response and show/hide the reduced-fidelity badge accordingly.
-2. Detect `status: "refused"` and render the refusal display instead of results.
-3. Render the execution trace from the real trace data returned by the API.
-
-**Step 3 — Error handling**
-1. Handle network errors gracefully (Backend not reachable, timeout, etc.)
-2. Show loading spinner while waiting for response (VQA can take 5–8 seconds).
-3. Handle edge cases: empty response, malformed JSON, missing fields.
-
-**Step 4 — Test with all 4 demo beats**
-1. Run all 4 beats through the UI:
-   - Beat 1: Upload single image → ask VQA question → see answer + confidence
-   - Beat 2: Upload 2 images → ask about changes → see change mask + reduced-fidelity badge
-   - Beat 3: Upload optical + SAR → ask fusion question → see composite + reduced-fidelity badge
-   - Beat 4: Upload 1 image → ask change question → see refusal display
+1. Connect upload and query flows to `/sensor-card` and `/query`.
+2. Render real answers, overlays, confidence badges, and execution traces.
+3. Render distinct refusal display for Beat 4.
+4. Add loading spinner and network error handling.
 
 ### 📋 Phase 3 Deliverables for Frontend:
-- [ ] UI connected to real Backend API — no more mock data
-- [ ] All 4 demo beats render correctly through the UI
-- [ ] Reduced-fidelity badge appears for Beats 2 and 3
-- [ ] Refusal renders correctly for Beat 4
-- [ ] Execution trace renders real data
-- [ ] Loading states and error handling work
+- [ ] UI connected to live Backend API
+- [ ] All 4 demo beats rendered with real data
+- [ ] Loading and refusal states working cleanly
 
 ---
 
 ## 🟡 Flex / QA — Phase 3
 
-**Your mission:** Run integration tests on the assembled pipeline. Break things. Find bugs before the demo.
+**Your mission:** Run full integration tests, conduct adversarial edge-case testing, and perform a latency audit.
 
 ### Step-by-step:
-
-**Step 1 — Run full integration tests**
-1. Complete `tests/test_integration.py`:
-   - `test_beat1_vqa()` — upload image, send VQA query, verify response schema
-   - `test_beat2_change()` — upload 2 images, verify change mask in response
-   - `test_beat3_fusion()` — upload optical + SAR, verify composite in response
-   - `test_beat4_refusal()` — upload 1 image, send change query, verify refusal
-2. Run all tests, log failures.
-
-**Step 2 — Adversarial testing**
-1. Try to break the system with edge cases:
-   - Upload a very large GeoTIFF (100MB+) — does it timeout?
-   - Upload 3 images when only 2 are expected — what happens?
-   - Submit an empty query string — does it crash?
-   - Submit a query in Hindi — does it handle gracefully?
-   - Upload a JPEG — does Input Gate reject it properly?
-2. Log every bug and report to the responsible role.
-
-**Step 3 — Latency audit**
-1. Time every demo beat end-to-end.
-2. Fill in the latency table:
-   | Beat | Total Time | Within Budget? |
-   |---|---|---|
-   | Beat 1 (VQA) | ___s | ≤ 10s? |
-   | Beat 2 (Change) | ___s | ≤ 5s? |
-   | Beat 3 (Fusion) | ___s | ≤ 5s? |
-   | Beat 4 (Refusal) | ___s | ≤ 2s? |
+1. Complete `tests/test_integration.py` for all 4 beats.
+2. Adversarial tests: corrupt files, non-overlapping tiles, invalid formats.
+3. Perform latency audit across all beats and log findings.
 
 ### 📋 Phase 3 Deliverables for Flex:
-- [ ] `tests/test_integration.py` — all 4 tests passing
-- [ ] Adversarial test results logged — bugs filed with responsible roles
-- [ ] Latency audit complete — all beats within budget or issues flagged
-- [ ] Edge case behavior documented
+- [ ] `tests/test_integration.py` passing
+- [ ] Adversarial test log completed
+- [ ] Latency audit documented
 
 ---
 
 ### 🤝 Phase 3 Sync — All Roles
 
-- [ ] Full pipeline works end-to-end for all 4 demo beats ✅
-- [ ] Frontend shows live data from Backend ✅
-- [ ] GPU Lead's VQA model is callable from the pipeline ✅
-- [ ] All known bugs fixed or documented ✅
-- [ ] **CRITICAL:** If anything is broken, this is the last chance to fix core functionality before Phase 4 adds deployment complexity
+- [ ] End-to-end pipeline operational for all 4 beats ✅
+- [ ] UI displaying live backend responses ✅
+- [ ] Evidence Contract cleanly refusing invalid queries ✅
+- [ ] **Ready for Phase 4 cloud deployment** ✅
 
 ---
 ---
@@ -872,186 +601,169 @@ Before moving to Phase 2, the team meets and confirms:
 
 ## 🔴 GPU Lead — Phase 4
 
-**Your mission:** Set up the tunnel so your GPU laptop serves VQA inference to the deployed system.
+**Your mission:** Deploy the fine-tuned VQA specialist to **Modal (Serverless GPU)** as the primary serving path, optimize cold starts and response formatting, and maintain the local tunnel purely as a development / backup option.
 
 ### Step-by-step:
 
-**Step 1 — Install and configure tunnel**
-1. Choose tunnel tool: `ngrok` (easier) or `cloudflare tunnel` (more stable).
-2. Install and authenticate:
+**Step 1 — Create and deploy Modal VQA endpoint (`deploy/modal_vqa.py`)**
+1. Install Modal CLI: `pip install modal` and authenticate (`modal setup`).
+2. Write `deploy/modal_vqa.py`:
+   - Define a Modal App (`satquery-vqa`).
+   - Create a Debian-based container image with `torch`, `transformers`, `peft`, `bitsandbytes`, `accelerate`, and `Pillow`.
+   - Mount model weights or download base `Qwen/Qwen2-VL-2B-Instruct` with the fine-tuned LoRA adapter (`models/qwen2vl_vqa_lora/`).
+   - Configure a GPU-accelerated serverless function (T4 / A10G / L4).
+   - Use `@modal.web_endpoint(method="POST")` or FastAPI app inside Modal to expose `/infer`.
+   - Optimize cold starts: set `keep_warm=1` during demo windows and cache model loading in memory.
+3. Deploy the function:
    ```bash
-   # ngrok
-   ngrok http 8001
-   
-   # or cloudflare tunnel
-   cloudflared tunnel --url http://localhost:8001
+   modal deploy deploy/modal_vqa.py
    ```
-3. Get the public URL (e.g., `https://abc123.ngrok.io`).
-4. Share this URL with Backend so they can configure the deployed app to call it.
+4. Test the deployed Modal URL directly with a test script: pass a sample image and question, confirm response JSON.
+5. Provide the live Modal endpoint URL to the Backend Lead.
 
-**Step 2 — Ensure VQA server is robust**
-1. Add error handling to `src/vqa_server.py`:
-   - Timeout handling (max 15 seconds per request)
-   - Memory monitoring (if VRAM usage spikes, log a warning)
-   - Auto-restart capability if the model crashes
-2. Test: send 10 queries rapidly — does it handle them without crashing?
+**Step 2 — Ensure response format compatibility & error handling**
+1. Guarantee that the Modal endpoint returns the exact schema expected by `vqa_specialist.py`:
+   ```json
+   {
+     "answer": "...",
+     "confidence": 0.88,
+     "grounding": {"bbox": [120, 80, 450, 600]},
+     "fidelity": "full",
+     "method": "qwen2-vl-2b-qlora-modal"
+   }
+   ```
+2. Handle image decoding, base64 payloads, and GeoTIFF band conversions cleanly.
 
-**Step 3 — Test the full deployed chain**
-1. Backend deploys to Railway/Render → you expose your laptop via tunnel.
-2. Test: public URL → Railway → tunnel → your laptop → VQA response → back to user.
-3. Measure round-trip latency. If > 15 seconds, investigate bottleneck.
+**Step 3 — Configure local laptop tunnel as secondary / emergency backup**
+1. Keep `src/vqa_server.py` and `deploy/tunnel_config.yml` ready.
+2. If Modal is unreachable or for offline local testing, run ngrok / Cloudflare tunnel:
+   ```bash
+   ngrok http 8001
+   ```
+3. Share the backup tunnel URL format with Backend for instant toggle if ever needed.
 
-**Step 4 — Stretch: serverless GPU**
-1. Only if tunnel is stable and time permits.
-2. Try deploying the VQA model to Modal or RunPod serverless.
-3. If it works, share the endpoint URL with Backend as a backup for the tunnel.
+**Step 4 — Measure roundtrip latency with Backend**
+1. Measure roundtrip inference time from Railway/Render to Modal GPU (< 5s target).
+2. Tweak token generation limits (`max_new_tokens=120`) to stay strictly within budget.
 
 ### 📋 Phase 4 Deliverables for GPU Lead:
-- [ ] Tunnel is live and stable — public URL works
-- [ ] VQA server handles errors gracefully
-- [ ] Full deployed chain tested end-to-end
-- [ ] Tunnel URL shared with Backend
-- [ ] Round-trip latency documented
+- [ ] `deploy/modal_vqa.py` — working Modal serverless GPU deployment
+- [ ] Modal endpoint live, deployed, and tested (`POST /infer`)
+- [ ] Response schema validated and 100% compatible with backend
+- [ ] Cold start optimized (< 5s inference latency)
+- [ ] Modal URL shared with Backend Lead
+- [ ] Local tunnel config documented as backup option
 
 ---
 
 ## 🔵 Backend Dev(s) — Phase 4
 
-**Your mission:** Upgrade the router to use sentence-transformers, add the Evidence Guard, build the output renderer, and deploy to Railway/Render.
+**Your mission:** Deploy the main orchestration app to Railway/Render, integrate the deployed Modal GPU endpoint via environment variables, implement automatic fallback handling, upgrade the router with sentence-transformers, and integrate the Evidence Guard.
 
 ### Step-by-step:
 
-**Step 1 — Upgrade Agentic Router**
-1. Upgrade `src/agentic_router.py`:
-   - Load `all-MiniLM-L6-v2` sentence-transformer (~80MB, CPU-only).
-   - Pre-compute embeddings for 10–15 canonical query templates per task type.
-   - On query: embed → cosine similarity → select best task.
-   - Keep the keyword rule overrides as a first-pass filter (from Phase 3).
-   - Return: `{"task_type": str, "confidence": float, "method": "rule_override" | "embedding_similarity"}`
-2. Test with 20+ diverse queries — verify accuracy.
+**Step 1 — Upgrade Agentic Router (`src/agentic_router.py`)**
+1. Integrate `all-MiniLM-L6-v2` sentence-transformer (~80MB, CPU-only).
+2. Embed canonical query templates and perform cosine similarity routing with deterministic rule overrides.
 
-**Step 2 — Evidence Guard (`src/evidence_guard.py`)**
-1. Implement fully:
-   - For VQA path: CLIP similarity + spectral cross-check (call `spectral_check.py`)
-   - For reduced-fidelity paths: spectral cross-check only
-   - Return: `{"C_guard": float, "C_spectral": float}`
-2. Integrate into the pipeline (after specialist, before confidence engine).
+**Step 2 — Evidence Guard & Confidence Engine**
+1. Complete `src/evidence_guard.py` (learned grounding / CLIP + CPU spectral NDWI/NDVI check).
+2. Complete `src/confidence_engine.py` (4-factor weighted score calculation).
+3. Complete `src/output_renderer.py` (overlay generation, PDF report via `fpdf2`, JSON trace).
 
-**Step 3 — Confidence Engine (`src/confidence_engine.py`)**
-1. Implement the 4-factor formula:
-   ```python
-   score = 0.15 * C_sensor + 0.35 * C_adapter + 0.25 * C_guard + 0.25 * C_spectral
-   ```
-2. Assign label: ≥ 0.85 = "High Evidence Consistency", 0.65–0.84 = "Moderate", < 0.65 = "Low"
-
-**Step 4 — Output Renderer (`src/output_renderer.py`)**
-1. Visual overlay: draw bounding boxes / change masks on the image using Pillow.
-2. JSON execution trace: already built (trace_logger).
-3. PDF report: use `fpdf2` to generate a 1-page summary with image, answer, confidence breakdown.
-4. Collaborate with Frontend on how overlays and PDFs are delivered (base64 in JSON? file download URL?).
-
-**Step 5 — Deploy to Railway/Render**
-1. Write `deploy/Dockerfile`:
+**Step 3 — Deploy Main App to Railway / Render**
+1. Create `deploy/Dockerfile`:
    ```dockerfile
    FROM python:3.11-slim
+   WORKDIR /app
    COPY requirements-cpu.txt .
-   RUN pip install -r requirements-cpu.txt
-   COPY src/ ./src/
-   CMD ["uvicorn", "src.app:app", "--host", "0.0.0.0", "--port", "8000"]
+   RUN pip install --no-cache-dir -r requirements-cpu.txt
+   COPY . .
+   EXPOSE 8000
+   CMD sh -c "uvicorn src.app:app --host 0.0.0.0 --port ${PORT:-8000}"
    ```
-2. Ensure `requirements-cpu.txt` excludes `torch` GPU dependencies.
-3. Configure the app to call GPU Lead's tunnel URL for VQA inference.
-4. Deploy and verify health endpoint is reachable.
+2. Deploy to **Railway** or **Render** as a web service.
+3. Set environment variable:
+   ```env
+   VQA_SERVER_URL=https://<your-modal-workspace>--satquery-vqa-infer.modal.run
+   ```
+
+**Step 4 — Implement Clean Fallback Handling**
+1. In `src/specialists/vqa_specialist.py`:
+   - Send HTTP request to `VQA_SERVER_URL` with a 10-second timeout.
+   - If Modal returns an error, times out, or is unreachable:
+     - Log warning in the execution trace: `"Modal GPU endpoint unreachable — falling back to CPU heuristics"`.
+     - Automatically execute fallback baseline heuristic response.
+     - Never crash the pipeline or return a 500 error to the user.
+
+**Step 5 — Verify deployed application**
+1. Test all 4 beats through the public Railway/Render URL.
 
 ### 📋 Phase 4 Deliverables for Backend:
-- [ ] `src/agentic_router.py` — sentence-transformer classifier + rule overrides
-- [ ] `src/evidence_guard.py` — dual verification working
-- [ ] `src/confidence_engine.py` — 4-factor score computed correctly
-- [ ] `src/output_renderer.py` — overlays, PDF report, JSON trace
-- [ ] App deployed to Railway/Render — public URL live
-- [ ] All 4 demo beats work through the deployed public URL
+- [ ] `src/agentic_router.py` — sentence-transformer router with rule overrides
+- [ ] `src/evidence_guard.py` & `src/confidence_engine.py` integrated
+- [ ] `src/output_renderer.py` — PDF report and visual overlays
+- [ ] Main app deployed on Railway/Render with public HTTPS URL
+- [ ] `VQA_SERVER_URL` environment variable configured to Modal
+- [ ] Automatic fallback logic tested and verified
+- [ ] All 4 demo beats working through public URL
 
 ---
 
 ## 🟢 Frontend Dev — Phase 4
 
-**Your mission:** Connect to the deployed public URL, add the PDF download feature, and polish the visual experience.
+**Your mission:** Point the frontend to the deployed Railway/Render URL, verify PDF report downloads, and polish the visual presentation.
 
 ### Step-by-step:
-
-**Step 1 — Point UI to deployed URL**
-1. Update the API base URL to the deployed Railway/Render URL.
-2. Verify all 4 demo beats work through the deployed system.
-
-**Step 2 — PDF download**
-1. Connect the "Download Report" button to the PDF endpoint from Backend.
-2. Trigger download when user clicks — should open/save a clean 1-page PDF.
-
-**Step 3 — Confidence breakdown display**
-1. Render the 4-factor confidence breakdown (not just the aggregate score):
-   ```
-   Sensor certainty:      0.83  ███████████░░
-   Adapter confidence:    0.88  ████████████░
-   Guard survival rate:   0.91  █████████████
-   Spectral agreement:    0.86  ████████████░
-   ──────────────────────────────────────────
-   Overall:               0.87  High Evidence Consistency
-   ```
-
-**Step 4 — Visual polish pass**
-1. Final color and spacing refinements.
-2. Ensure all badge colors are consistent (green/yellow/red for confidence, orange for reduced-fidelity).
-3. Make sure the refusal display is visually distinct and impossible to miss.
+1. Update API base URL to the public Railway/Render endpoint.
+2. Verify all 4 demo beats through the deployed cloud system.
+3. Wire the "Download Report" button to the live PDF generation endpoint.
+4. Render the 4-factor confidence breakdown with clean progress bars and badges.
+5. Polish color schemes, typography, and refusal state visibility.
 
 ### 📋 Phase 4 Deliverables for Frontend:
-- [ ] UI works against deployed public URL
-- [ ] PDF download works
-- [ ] 4-factor confidence breakdown renders beautifully
-- [ ] Visual polish complete — demo-ready appearance
+- [ ] Frontend operational against public Railway/Render URL
+- [ ] PDF report download working seamlessly
+- [ ] 4-factor confidence breakdown visually rendered
+- [ ] UI polished and demo-ready
 
 ---
 
 ## 🟡 Flex / QA — Phase 4
 
-**Your mission:** Test the deployed system, prepare the final demo flow, and make sure fallbacks work.
+**Your mission:** Extensively test the deployed cloud system, verify fallback layers, and record high-quality backup videos of all 4 beats (Layer 3 fallback).
 
 ### Step-by-step:
 
-**Step 1 — Test deployed system**
-1. Access the public URL from a completely different device/network.
-2. Run all 4 demo beats. Log any failures.
-3. Test tunnel stability: does the VQA path still work after 30 minutes? After the laptop sleeps and wakes?
+**Step 1 — Test deployed cloud system from external devices**
+1. Access the Railway/Render URL from independent laptops, phones, and networks.
+2. Run all 4 beats. Verify end-to-end execution without reliance on any local server.
 
-**Step 2 — Stress test**
-1. Send 5 VQA queries in rapid succession — does the system handle them?
-2. Try submitting queries while the tunnel is momentarily down — does the system fail gracefully?
+**Step 2 — Test fallback layers**
+1. **Layer 1 test**: Temporarily invalidate `VQA_SERVER_URL` in test config — verify the app gracefully falls back to CPU heuristics with an execution trace warning.
+2. **Layer 2 test**: Verify the backup local tunnel configuration (`src/vqa_server.py` + ngrok).
+3. **Layer 3 recording (CRITICAL)**:
+   - Record high-definition (1080p) screen captures of each beat running successfully.
+   - Save to `demo/backup_beat1.mp4` through `demo/backup_beat4.mp4`.
 
-**Step 3 — Verify fallback layers**
-1. **Layer 1 test**: Ask GPU Lead to temporarily disconnect the fine-tuned adapter. Does the system fall back to the base model?
-2. **Layer 2 test**: Test the CPU-only / 4-bit quantization path.
-3. **Layer 3 prep**: If the tunnel is unstable, start recording backup videos NOW. Do not wait for Phase 5.
-
-**Step 4 — Finalize demo flow**
-1. Update `demo/demo_cases.json` with the final query wordings and expected outputs.
-2. Update `demo/speaker_notes.md` with exact timing and transitions.
-3. Do a practice run-through of the entire 4-beat demo script alone (no live system needed — just read through the script and practice the narrative).
+**Step 3 — Finalize demo script & speaker notes**
+1. Update `demo/speaker_notes.md` with finalized timings and narrative cues.
 
 ### 📋 Phase 4 Deliverables for Flex:
-- [ ] Deployed system tested from external device — all 4 beats work
-- [ ] Stress test results documented
-- [ ] Fallback Layer 1 and Layer 2 verified
-- [ ] Demo flow finalized — speaker notes updated
-- [ ] **CRITICAL:** If tunnel is unstable, backup videos must be recorded in this phase
+- [ ] Deployed split-cloud system verified from external networks
+- [ ] Automatic fallback tested and confirmed
+- [ ] High-definition backup videos recorded for all 4 beats (`demo/backup_beat*.mp4`)
+- [ ] `demo/speaker_notes.md` finalized
 
 ---
 
 ### 🤝 Phase 4 Sync — All Roles
 
-- [ ] Deployed system fully operational ✅
-- [ ] All 4 demo beats work through the public URL ✅
-- [ ] Tunnel is stable (or backup videos recorded) ✅
-- [ ] All fallback layers verified ✅
-- [ ] Demo script finalized ✅
+- [ ] Main app live on Railway/Render ✅
+- [ ] VQA specialist deployed on Modal serverless GPU ✅
+- [ ] Split cloud communication working seamlessly ✅
+- [ ] Automatic fallback and backup videos verified ✅
+- [ ] All 4 demo beats functional on public URL ✅
 
 ---
 ---
@@ -1063,19 +775,20 @@ Before moving to Phase 2, the team meets and confirms:
 ## 🔴 GPU Lead — Phase 5
 
 ### Step-by-step:
-1. **Keep the tunnel alive.** Your laptop must be online and serving during all rehearsals and the actual demo.
-2. **Optimize VQA latency** — if inference > 5 seconds:
-   - Reduce `max_new_tokens` (e.g., 150 → 100)
-   - Enable flash attention if supported
-   - Pre-load the image in memory instead of reading from disk each time
-3. **Help record backup videos** — screen-record each demo beat with clean output for Layer-3 fallback.
-4. **Participate in full dress rehearsal** — run all 4 beats live, timed.
-5. **Monitor GPU during rehearsal** — watch for VRAM leaks or thermal throttling.
+1. **Monitor Modal endpoint health** — run periodic warm-up pings before rehearsals.
+2. **Optimize inference latency**:
+   - Ensure Modal container caching is active.
+   - Keep token generation concise (`max_new_tokens=100–120`).
+3. **Assist with dress rehearsals**:
+   - Verify VQA response quality on all demo questions.
+   - Confirm cold-start latency is < 5 seconds.
+4. **Maintain backup tunnel ready**:
+   - Have local `vqa_server.py` running in the background on your machine as an instant fallback.
 
 ### 📋 Phase 5 Deliverables for GPU Lead:
-- [ ] Tunnel stable for 2+ hours continuously
-- [ ] VQA inference optimized (≤ 5 seconds per query)
-- [ ] Backup videos recorded (your screen showing VQA responses)
+- [ ] Modal serverless GPU endpoint responsive with low latency (< 5s)
+- [ ] Inference parameters optimized
+- [ ] Backup local server on standby
 - [ ] 3+ full dress rehearsals completed
 
 ---
@@ -1083,22 +796,21 @@ Before moving to Phase 2, the team meets and confirms:
 ## 🔵 Backend Dev(s) — Phase 5
 
 ### Step-by-step:
-1. **Fix any remaining bugs** from Phase 4 testing.
+1. **Fix any remaining edge-case bugs** identified during QA testing.
 2. **Latency optimization**:
-   - Profile the pipeline — find the slowest non-GPU step
-   - Cache sentence-transformer model on startup (don't reload per request)
-   - Pre-compute anything that can be pre-computed
-3. **PDF report polish** — make the generated PDF look professional:
-   - Clean layout, proper fonts, SatQuery branding
-   - Include: query, answer, confidence breakdown, execution trace summary, image thumbnail
-4. **Final API stability check** — restart the deployed server and verify it comes back clean.
-5. **Code freeze** after all fixes are in.
+   - Cache router model and pre-computed embeddings on container startup.
+   - Ensure rasterio operations are optimized.
+3. **PDF report polish**:
+   - Verify layout, fonts, confidence table, and SatQuery header branding.
+4. **Cloud stability verification**:
+   - Restart the Railway/Render service and verify it boots up cleanly and reconnects to Modal.
+5. **Enforce Code Freeze**.
 
 ### 📋 Phase 5 Deliverables for Backend:
-- [ ] All known bugs fixed
-- [ ] Pipeline latency ≤ 10 seconds (total)
-- [ ] PDF report looks professional
-- [ ] Deployed server stable after restart
+- [ ] All known bugs resolved
+- [ ] Total pipeline latency ≤ 8–10 seconds
+- [ ] PDF report generated cleanly
+- [ ] Cloud service verified stable across restarts
 - [ ] **CODE FREEZE**
 
 ---
@@ -1107,58 +819,41 @@ Before moving to Phase 2, the team meets and confirms:
 
 ### Step-by-step:
 1. **Final visual polish pass**:
-   - Typography, spacing, alignment
-   - Ensure every interactive element has hover/click feedback
-   - Test on different screen sizes (demo will likely be on a projector — test at 1080p)
+   - Verify responsiveness on 1080p presentation displays.
+   - Ensure clear visual contrast on confidence badges and refusal alerts.
 2. **Loading UX**:
-   - Smooth loading spinner during VQA inference (5–8 second wait)
-   - Consider a progress stepper: "Validating input... Routing query... Running specialist..."
-3. **Demo-specific tweaks**:
-   - Make sure the demo flow is frictionless — minimize clicks between beats
-   - Pre-fill query text for each demo beat if possible (to save typing time during live demo)
-4. **Screenshot the UI** — capture clean screenshots of all states for the pitch deck if needed.
+   - Smooth loading spinner with descriptive step indicators ("Analyzing Imagery → Routing Query → Running VQA Specialist → Verifying Physics...").
+3. **Frictionless demo UX**:
+   - Quick-load buttons or pre-filled queries for the 4 demo beats to prevent typing mistakes during live evaluation.
+4. **Capture UI screenshots** for presentation slides.
 
 ### 📋 Phase 5 Deliverables for Frontend:
-- [ ] UI fully polished — looks premium on a 1080p display
-- [ ] Loading states are smooth and informative
-- [ ] Demo flow is frictionless (minimal clicks per beat)
-- [ ] Screenshots captured for pitch deck
+- [ ] UI visual polish complete for 1080p display
+- [ ] Informative loading progression indicator
+- [ ] Quick-select demo presets implemented
+- [ ] Presentation screenshots captured
 
 ---
 
 ## 🟡 Flex / QA — Phase 5
 
 ### Step-by-step:
-1. **Record all 4 backup videos** (Layer-3 fallback):
-   - Screen-record each demo beat in 1080p
-   - Clean, edited, no cursor fumbling
-   - Save as `demo/backup_beat1.mp4` through `demo/backup_beat4.mp4`
-   - These are the absolute last resort — they must look perfect
-2. **Finalize speaker notes** (`demo/speaker_notes.md`):
-   - Exact words for each beat transition
-   - Time budget per beat (aim for 2 minutes each, 8 minutes total)
-   - Key talking points for judges:
-     - Beat 1: "This is the real fine-tuned model — RS-adapted, not generic"
-     - Beat 2: "Full agentic pipeline — reduced-fidelity specialist by design"
-     - Beat 3: "Same architecture — demonstrates cross-modal routing"
-     - Beat 4: "Evidence Contract proves the system knows what it doesn't know"
-3. **Run the final dress rehearsal**:
-   - All 4 roles present
-   - Run all 4 beats live, timed
-   - Practice handling failures (what do you do if the tunnel drops mid-demo?)
-   - Practice the scope-reduction pitch: "This is a deliberate engineering trade-off..."
-4. **Prepare the judge Q&A cheat sheet**:
-   - Likely question: "Why are only some paths fine-tuned?" → Answer: 8GB VRAM constraint, deliberate trade-off
-   - Likely question: "How would you scale this?" → Answer: Replace placeholders with trained models, add GPU resources
-   - Likely question: "What's the evidence that fine-tuning worked?" → Answer: Show eval report metrics
-5. **GO / NO-GO checklist** — final confirmation:
+1. **Verify all 4 backup videos** (Layer-3 fallback):
+   - Confirm `demo/backup_beat1.mp4` through `demo/backup_beat4.mp4` are 1080p, crisp, and stored locally on the presentation laptop.
+2. **Finalize pitch script & judge Q&A cheat sheet**:
+   - Prepare answers for architectural questions:
+     - *"How is the model deployed?"* → Split-cloud architecture: Railway/Render for orchestration + Modal serverless GPU for VQA inference.
+     - *"What happens if the GPU endpoint fails?"* → Automatic fallback to CPU heuristics, plus local tunnel standby and pre-rendered videos.
+     - *"Why are change detection and SAR fusion reduced-fidelity?"* → Deliberate engineering prioritization under hackathon constraints, fully complete agentic routing architecture.
+3. **Coordinate full dress rehearsals**:
+   - Run 3+ timed rehearsals with all team members present.
+   - Practice smooth transitions between live demo and narrative points.
 
 ### 📋 Phase 5 Deliverables for Flex:
-- [ ] `demo/backup_beat1.mp4` through `demo/backup_beat4.mp4` — recorded, clean, 1080p
-- [ ] `demo/speaker_notes.md` — finalized with exact script
-- [ ] `demo/judge_qa_cheatsheet.md` — prepared
-- [ ] Full dress rehearsal completed with all team members
-- [ ] Failure recovery plan documented (what to do when things break live)
+- [ ] Layer-3 backup videos confirmed ready on presentation device
+- [ ] `demo/speaker_notes.md` finalized with exact 8-minute timing
+- [ ] `demo/judge_qa_cheatsheet.md` prepared
+- [ ] 3+ timed dress rehearsals completed
 
 ---
 
@@ -1166,13 +861,12 @@ Before moving to Phase 2, the team meets and confirms:
 
 The entire team confirms:
 
-- [ ] 🔴 GPU: Tunnel stable, model serving, latency optimized ✅
-- [ ] 🔵 Backend: API deployed, stable, code frozen ✅
-- [ ] 🟢 Frontend: UI polished, connected to deployed API ✅
-- [ ] 🟡 Flex: Backup videos recorded, speaker notes finalized ✅
-- [ ] **All 4 demo beats work live** ✅
-- [ ] **All 3 fallback layers tested** ✅
-- [ ] **Speaker notes rehearsed** ✅
-- [ ] **Judge Q&A prepared** ✅
+- [ ] 🔴 GPU: Modal VQA endpoint deployed, warm, latency < 5s ✅
+- [ ] 🔵 Backend: Railway/Render app online, fallback tested, code frozen ✅
+- [ ] 🟢 Frontend: UI polished, quick presets ready, 1080p verified ✅
+- [ ] 🟡 Flex: Backup videos on deck, speaker notes finalized, rehearsals complete ✅
+- [ ] **All 4 demo beats work live on public URL** ✅
+- [ ] **All 3 fallback layers verified** ✅
+- [ ] **Judge Q&A answers prepared** ✅
 
 ### ✅ **GO — Ready to present.**

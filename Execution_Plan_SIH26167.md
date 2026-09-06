@@ -1,7 +1,8 @@
 # Execution Plan — SIH26167 SatQuery EvidenceSwarm
 ### Phased Build Sprint
 **Derived from:** Solution_SIH26167 (2).md (Revised)
-**Hardware constraint:** 8GB VRAM laptop
+**Hardware constraint (Local Dev / Training):** 8GB VRAM laptop
+**Cloud Serving Architecture:** Railway / Render (Orchestration & Frontend) + Modal (Serverless GPU for VQA)
 **Model:** Qwen2-VL-2B-Instruct (QLoRA fine-tuned)
 **Date:** September 2, 2026
 
@@ -14,9 +15,10 @@ Phase 1               Phase 2                Phase 3                 Phase 4    
 Data Engineering       Model Training         Pipeline Integration    Agentic Wiring          Polish & Delivery
 ────────────────────  ─────────────────────  ──────────────────────  ──────────────────────  ──────────────────
 • Dataset curation     • QLoRA fine-tune      • End-to-end wiring     • Router ↔ 4 paths      • Visual polish
-• Input Gate           • VQA validation       • Evidence Contract     • Split deployment      • Latency tuning
-• Sensor Card          • 3 placeholders       • Lock demo cases       • Evidence Guard         • Demo rehearsal
-• Spectral script      • Eval metrics                                 • Tunnel setup           • Backup videos
+• Input Gate           • VQA validation       • Evidence Contract     • Modal GPU deployment  • Latency tuning
+• Sensor Card          • 3 placeholders       • Lock demo cases       • Railway/Render deploy • Demo rehearsal
+• Spectral script      • Eval metrics         • Local test server     • Evidence Guard        • Backup videos
+                                                                      • Auto-fallback logic
 ```
 
 ---
@@ -251,7 +253,7 @@ Build all three placeholder specialists. Each follows the same pattern: receive 
 - [ ] VQA specialist outperforms base model on eval
 - [ ] All 3 placeholder specialists produce structured output
 - [ ] Every specialist output includes `fidelity` field
-- [ ] **BLOCKER CHECK:** VQA inference latency ≤ 8–10 seconds on laptop GPU
+- [ ] **BLOCKER CHECK:** VQA inference latency ≤ 8–10 seconds on local GPU / benchmark
 
 ---
 
@@ -356,7 +358,7 @@ Select and freeze the exact image files and queries for each demo beat:
 
 ## Phase 4 — Agentic Wiring & Deployment
 
-**Goal:** Integrate the agentic router, set up split deployment, and integrate the Evidence Guard.
+**Goal:** Integrate the agentic router, deploy the main app to Railway/Render, serve the fine-tuned VQA model via Modal serverless GPU, and integrate the Evidence Guard with robust fallback handling.
 
 ### Task 4.1 — Agentic Router Integration
 
@@ -432,32 +434,41 @@ Select and freeze the exact image files and queries for each demo beat:
 
 ---
 
-### Task 4.4 — Split Deployment Setup
+### Task 4.4 — Split Cloud Deployment Setup
 
-**Steps:**
-1. **Orchestration layer (CPU-only) → Railway or Render:**
-   - Create `Dockerfile` for the FastAPI app (exclude GPU dependencies).
-   - Ensure all placeholder specialists run on CPU.
-   - Deploy to Railway or Render as a web service.
-   - Verify health endpoint is reachable from public URL.
+The system deploys via a modern split-cloud architecture ensuring public judge URL availability without requiring the presenter's laptop to stay online.
 
-2. **VQA model inference (GPU) → Laptop via tunnel:**
-   - Install `ngrok` or `cloudflare tunnel` on the laptop.
-   - Create a lightweight FastAPI endpoint `POST /infer` on the laptop that accepts an image + query and returns VQA output.
-   - Expose this endpoint via tunnel.
-   - Configure the deployed orchestration layer to call the tunnel URL for VQA inference.
-   - Test the full chain: public URL → Railway → tunnel → laptop GPU → response.
+#### 4.4.1 — Orchestration Layer Deployment (Railway / Render)
+1. Write `deploy/Dockerfile` and `requirements-cpu.txt` for the main FastAPI + Frontend container (CPU-only, no heavy PyTorch GPU dependencies).
+2. Deploy to **Railway** or **Render** as a web service.
+3. Configure environment variable `VQA_SERVER_URL` pointing to the deployed Modal GPU endpoint.
+4. Verify `/health` and UI are live on the public URL (e.g., `https://satquery.up.railway.app`).
 
-3. **Stretch goal — Serverless GPU (Modal/RunPod):**
-   - Only attempt if deployment is stable and buffer time remains.
-   - Package model + inference code as a Modal function or RunPod serverless endpoint.
+#### 4.4.2 — Fine-Tuned VQA Model Serving (Modal Serverless GPU — Primary)
+1. Build `deploy/modal_vqa.py`:
+   - Define a Modal App with a custom Debian image containing `torch`, `transformers`, `peft`, `bitsandbytes`, and `accelerate`.
+   - Mount base `Qwen/Qwen2-VL-2B-Instruct` model and `models/qwen2vl_vqa_lora/` adapter weights.
+   - Configure a GPU-accelerated serverless function (T4 / A10G / L4).
+   - Expose an authenticated web endpoint `POST /infer` accepting image and question.
+   - Add container keep-warm and cold-start caching to keep inference latency < 5s.
+2. Deploy to Modal: `modal deploy deploy/modal_vqa.py`.
+3. Obtain public Modal endpoint URL and set it in Railway/Render environment variables.
 
-**Deliverable:** Deployed public URL, working tunnel setup, `Dockerfile`, `deploy/` config files
+#### 4.4.3 — Resilient Fallback Handling
+1. In `src/specialists/vqa_specialist.py`, implement an async HTTP client to call `VQA_SERVER_URL` with a 10s timeout.
+2. **Automatic Fallback**: If the Modal endpoint times out, errors, or is unreachable, automatically fall back to CPU heuristic templates or the base model with an informative execution trace warning.
+
+#### 4.4.4 — Local Laptop Tunnel (Development / Emergency Backup Only)
+1. Retain `deploy/tunnel_config.yml` and `src/vqa_server.py` strictly as a local development tool and emergency offline backup.
+2. If cloud connections are completely down, the backend can be repointed to a local ngrok/Cloudflare tunnel URL in seconds.
+
+**Deliverable:** Live Railway/Render public URL, deployed Modal GPU endpoint (`deploy/modal_vqa.py`), `deploy/Dockerfile`, configured fallback handling
 
 **Verification:**
-- [ ] Public URL returns health check OK.
-- [ ] Full query through public URL → laptop tunnel → VQA response works.
-- [ ] Latency through tunnel is acceptable (< 15 seconds total including network).
+- [ ] Railway/Render public URL loads UI and returns health check OK.
+- [ ] Modal GPU endpoint `/infer` responds to VQA queries in < 5 seconds.
+- [ ] Full query through public URL → Railway → Modal GPU → response works end-to-end.
+- [ ] Graceful fallback triggers if `VQA_SERVER_URL` is temporarily disabled.
 
 ---
 
@@ -466,10 +477,11 @@ Select and freeze the exact image files and queries for each demo beat:
 - [ ] Router correctly classifies and dispatches all 4 query types
 - [ ] Evidence Guard runs on VQA output and produces guard scores
 - [ ] Confidence Engine computes and labels scores correctly
-- [ ] Deployment is live — public URL works
-- [ ] Tunnel from laptop GPU is stable
-- [ ] All 4 demo beats work through the deployed system
-- [ ] **BLOCKER CHECK:** If tunnel is unstable, record demo videos immediately (Layer 3 fallback)
+- [ ] Railway/Render public URL is live and responsive
+- [ ] Modal serverless GPU endpoint is deployed and responding
+- [ ] All 4 demo beats work through the live public URL
+- [ ] Automatic fallback functions cleanly when Modal is disconnected
+- [ ] **BLOCKER CHECK:** Record Layer-3 backup videos immediately to guarantee zero presentation risk
 
 ---
 
@@ -500,15 +512,15 @@ Select and freeze the exact image files and queries for each demo beat:
 | Input Gate + Sensor Card | < 1 second |
 | Evidence Contract | < 0.5 seconds |
 | Agentic Router | < 0.5 seconds |
-| VQA Specialist (GPU) | < 5 seconds |
+| VQA Specialist (Modal GPU) | < 5 seconds |
 | Placeholder Specialists (CPU) | < 2 seconds |
 | Evidence Guard | < 1 second |
 | Confidence + Rendering | < 1 second |
 | **Total pipeline** | **≤ 8–10 seconds** |
 
 **Steps:**
-1. Profile the full pipeline end-to-end. Identify bottleneck.
-2. If VQA inference is too slow: reduce `max_new_tokens`, enable flash attention if supported.
+1. Profile the full pipeline end-to-end. Identify bottlenecks.
+2. Optimize Modal GPU container: adjust `max_new_tokens` and warm-up pings.
 3. If spectral check is slow: pre-compute indices on upload rather than at query time.
 4. Cache sentence-transformer embeddings for the router.
 
@@ -517,13 +529,13 @@ Select and freeze the exact image files and queries for each demo beat:
 ### Task 5.3 — Demo Rehearsal & Backup Recording
 
 **Steps:**
-1. **Full rehearsal**: Run all 4 demo beats through the live system, end-to-end, at least 3 times.
+1. **Full rehearsal**: Run all 4 demo beats through the live deployed system at least 3 times.
 2. **Time each beat**: Ensure each beat fits within a 2-minute pitch segment.
 3. **Script the narrative**: Write exact speaker notes for each beat transition.
 4. **Record Layer-3 backup videos**:
-   - Screen-record each of the 4 beats in high definition.
+   - Screen-record each of the 4 beats in high definition (1080p).
    - Save as `demo/backup_beat1.mp4`, `demo/backup_beat2.mp4`, etc.
-   - These are the absolute last-resort fallback if everything goes wrong live.
+   - These are the absolute last-resort fallback if internet/cloud access fails during the live presentation.
 5. **Stress-test the refusal path**: Try 5+ adversarial queries to make sure the Evidence Contract holds.
 
 **Deliverable:** `demo/speaker_notes.md`, `demo/backup_beat*.mp4`
@@ -535,7 +547,8 @@ Select and freeze the exact image files and queries for each demo beat:
 **Steps:**
 1. Run the complete demo flow one final time, live, as if presenting to judges.
 2. Verify:
-   - [ ] All 4 beats execute correctly through the deployed URL.
+   - [ ] All 4 beats execute correctly through the public Railway/Render URL.
+   - [ ] Modal GPU endpoint handles VQA query quickly and accurately.
    - [ ] Refusal beat triggers cleanly.
    - [ ] Confidence scores render correctly.
    - [ ] PDF report downloads and looks professional.
@@ -543,15 +556,15 @@ Select and freeze the exact image files and queries for each demo beat:
    - [ ] Reduced-fidelity badge displays for Beats 2 and 3.
 3. **Code freeze**: No more changes after this point.
 4. Ensure fallback layers are ready:
-   - [ ] Layer 1: Base model fallback works if adapter fails.
-   - [ ] Layer 2: 4-bit quantization + CPU-only mode works.
-   - [ ] Layer 3: All 4 backup videos recorded and accessible.
+   - [ ] Layer 1: Automatic fallback to base model / CPU heuristic if Modal endpoint fails.
+   - [ ] Layer 2: Local laptop GPU tunnel / CPU mode available for offline fallback.
+   - [ ] Layer 3: All 4 backup videos recorded and immediately accessible on presentation device.
 
 ---
 
 ### Phase 5 Exit Checklist (FINAL)
 
-- [ ] UI is polished and demo-ready
+- [ ] UI is polished and demo-ready on public URL
 - [ ] Full pipeline latency ≤ 10 seconds
 - [ ] All 4 demo beats rehearsed ≥ 3 times
 - [ ] Speaker notes finalized
@@ -577,8 +590,9 @@ SatQuery-AI/
 │   ├── output_renderer.py            # Visual overlay + PDF/JSON report generation
 │   ├── spectral_check.py             # CPU-only NDWI/NDVI Otsu thresholding
 │   ├── trace_logger.py               # SQLite execution trace logger
+│   ├── vqa_server.py                 # Local VQA inference server (dev/backup)
 │   └── specialists/
-│       ├── vqa_specialist.py          # [FINE-TUNED] Qwen2-VL-2B QLoRA inference
+│       ├── vqa_specialist.py          # [FINE-TUNED] Client calling Modal VQA endpoint (with local fallback)
 │       ├── caption_grounding.py       # [REDUCED-FIDELITY] Rule-based captioning
 │       ├── change_detection.py        # [REDUCED-FIDELITY] Image differencing
 │       └── optical_sar_fusion.py      # [REDUCED-FIDELITY] Band-overlay heuristic
@@ -594,8 +608,9 @@ SatQuery-AI/
 │   ├── images/                        # Demo GeoTIFF files
 │   └── backup_beat*.mp4               # Layer-3 fallback videos
 ├── deploy/
-│   ├── Dockerfile                     # CPU-only orchestration container
-│   └── tunnel_config.yml              # ngrok/Cloudflare tunnel config
+│   ├── Dockerfile                     # CPU-only orchestration container for Railway/Render
+│   ├── modal_vqa.py                   # Modal serverless GPU deployment script for VQA
+│   └── tunnel_config.yml              # Backup ngrok/Cloudflare tunnel config (dev only)
 ├── scripts/
 │   └── finetune_vqa.py                # QLoRA fine-tuning script
 ├── tests/
@@ -605,7 +620,8 @@ SatQuery-AI/
 │   └── test_router.py
 ├── results/
 │   └── vqa_eval_report.md             # Fine-tuning evaluation results
-├── requirements.txt
+├── requirements-cpu.txt               # Lightweight dependencies for Railway/Render
+├── requirements.txt                   # Complete dependency specification
 └── README.md
 ```
 
@@ -619,11 +635,15 @@ SatQuery-AI/
 | **Phase 2** | OOM during fine-tuning | Dry run with 10 samples first; reduce batch/seq length if OOM |
 | **Phase 2** | Fine-tuned model doesn't outperform base | If < 5% improvement, adjust data/hyperparams and re-train |
 | **Phase 3** | Pipeline integration errors | Test each component in isolation before wiring |
-| **Phase 4** | Tunnel is unreliable for live demo | Immediately record backup videos (Layer 3 fallback) |
-| **Phase 5** | System crashes during rehearsal | Confirm all 3 fallback layers are operational |
+| **Phase 4** | Modal cold start / latency or endpoint glitch | Optimize container keep-warm; test automatic fallback and local backup; record backup videos |
+| **Phase 5** | Network / cloud outage during presentation | Execute Layer-3 recorded video fallback with zero downtime |
 
 ---
 
-## Open Decision Required
+## Deployment Architecture Decision
 
-> **Judge-testable URL vs. live local demo:** The deployment plan assumes a tunnel-based approach for GPU inference. If the SIH internal round requires a persistent public URL that judges can test independently (without the laptop being online), the team must allocate Phase 4 buffer time to deploy the VQA model to a serverless GPU host (Modal/RunPod) instead of relying on the laptop tunnel. This decision should be resolved **before Phase 3**.
+> **Finalized Strategy — Split Cloud Architecture:**
+> The deployment architecture is finalized as a **Split Cloud Deployment**:
+> - **Main Web Application & Orchestration**: Deployed on **Railway / Render** to provide a persistent, judge-testable public URL that is always online.
+> - **Fine-Tuned VQA Model**: Served via **Modal (Serverless GPU)**, providing high-performance GPU execution on demand without continuous hosting costs or reliance on a local laptop staying awake during the demo.
+> - **Resilience**: The backend incorporates automatic fallback to base model / CPU heuristics if the GPU endpoint is unreachable. Local laptop tunneling (ngrok / Cloudflare Tunnel) is preserved purely as a development tool and emergency backup option.

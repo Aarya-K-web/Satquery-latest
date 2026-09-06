@@ -1,61 +1,71 @@
-# Tunnel Setup — GPU Lead Phase 4 (SIH26167)
+# SatQuery EvidenceSwarm (SIH26167) — VQA GPU Inference Architecture & Setup
 
-Expose `src/vqa_server.py :8001` to the deployed Railway/Render backend.
+This document outlines the VQA inference deployment hierarchy for SatQuery EvidenceSwarm.
 
-## Option A — ngrok (easiest)
+---
+
+## 🚀 Primary Production Architecture — Modal Serverless GPU
+
+The primary production deployment runs the Qwen2-VL-2B-Instruct QLoRA specialist on **Modal Serverless GPU** (NVIDIA T4 / A10G), providing automated scaling, zero-idle cost, and robust cloud-to-cloud low-latency execution with Railway/Render.
+
+### 1. Deploy to Modal
 ```bash
-# 1. Install https://ngrok.com/download
-pip install ngrok  # or brew/choco install ngrok
-ngrok config add-authtoken <YOUR_TOKEN>
-
-# 2. Start VQA server (terminal 1)
-uvicorn src.vqa_server:app --host 0.0.0.0 --port 8001
-
-# 3. Expose (terminal 2)
-ngrok http 8001
-# → Forwarding https://abc123.ngrok-free.app -> http://localhost:8001
+# From workspace root
+modal deploy src/specialists/modal_vqa.py
+# → Output URL: https://<your-workspace>--satquery-vqa-infer.modal.run
 ```
-Copy the `https://*.ngrok-free.app` URL.
 
-## Option B — Cloudflare Tunnel (more stable, no auth wall)
+### 2. Configure Production Backend (Railway / Render)
+Set the environment variable on the deployed backend:
+```env
+VQA_SERVER_URL=https://<your-workspace>--satquery-vqa-infer.modal.run/infer
+```
+
+### 3. Verification
 ```bash
-# Install cloudflared https://developers.cloudflare.com/cloudflare-one/connections/connect/networks/downloads/
-cloudflared tunnel --url http://localhost:8001
-# → https://random-words-1234.trycloudflare.com
-```
-
-## Share URL with Backend
-Set on deployed backend (Railway/Render env vars):
-```
-VQA_SERVER_URL=https://abc123.ngrok-free.app/infer
-VQA_PUBLIC_URL=https://abc123.ngrok-free.app
-```
-Local fallback still works (`http://127.0.0.1:8001/infer` + multipart).
-
-## Verify
-```bash
-curl https://abc123.ngrok-free.app/health
-curl -X POST https://abc123.ngrok-free.app/infer \
+curl https://<your-workspace>--satquery-vqa-infer.modal.run/health
+curl -X POST https://<your-workspace>--satquery-vqa-infer.modal.run/infer \
   -F "file=@demo/images/sentinel2_urban_mumbai.tif" \
   -F "question=Is urban area present?"
-# expect {"answer":"Yes, urban fabric is visible","fidelity":"full","latency_s":<8}
 ```
+*Note: The backend orchestrator automatically skips JSON file-path attempts for remote Modal endpoints, directly streaming multipart payload with a 25-second cold-start tolerance.*
 
-## Round-trip latency (measured)
-- Direct VQA (`:8001/infer`) warm: 3–5s, throttled to 15s timeout
-- Backend `/api/query` via tunnel (Railway → ngrok → laptop): ~6–9s (adds 1–2s HTTP + 0.5s queuing)
-- Budget: <15s end-to-end (spec). Keep `max_new_tokens=48` and VRAM <6.5GB.
+---
 
-## Robustness (Phase 4 hardening)
-- 15s per-request timeout (504)
-- Semaphore 2 concurrent, queue rest
-- VRAM guard logs WARN >6.5GB, auto `torch.cuda.empty_cache()`
-- CUDA OOM auto-reset + retry heuristic fallback (never crashes)
-- Health exposes `vram`, `requests`, `errors`, `public_url`
+## 🛠️ Local Development & Offline Fallbacks
 
-## Stretch — Serverless GPU fallback (Modal/RunPod)
-If tunnel unstable:
+If testing offline or running a dedicated local GPU laptop alongside backend services, use tunnels or local bindings:
+
+### Fallback Option A — Direct Local GPU Server
+When running backend and GPU server on the same physical workstation:
 ```bash
-modal deploy modal_vqa.py  # wraps src.specialists.vqa_specialist
-# share https://<modal-id>.modal.run/infer as backup VQA_SERVER_URL
+uvicorn src.vqa_server:app --host 127.0.0.1 --port 8001
+# Backend default: VQA_SERVER_URL=http://127.0.0.1:8001/infer (utilizes JSON fast-path)
 ```
+
+### Fallback Option B — ngrok Tunnel (Development / Local Laptop)
+```bash
+# 1. Start VQA server locally
+uvicorn src.vqa_server:app --host 0.0.0.0 --port 8001
+
+# 2. Expose via ngrok
+ngrok http 8001
+# → Forwarding https://abc123.ngrok-free.app -> http://localhost:8001
+
+# 3. Set environment variable on Railway/Render for testing
+VQA_SERVER_URL=https://abc123.ngrok-free.app/infer
+```
+
+### Fallback Option C — Cloudflare Tunnel (Development / Local Laptop)
+```bash
+cloudflared tunnel --url http://localhost:8001
+# → https://random-words-1234.trycloudflare.com
+# Set VQA_SERVER_URL=https://random-words-1234.trycloudflare.com/infer
+```
+
+---
+
+## ⚡ Fallback & Reliability Guardrails
+1. **Modal / Tunnel Cold Starts**: 25-second multipart request timeout accommodates serverless container provisioning.
+2. **Offline / Outage Tolerance**: If the remote GPU endpoint times out or is unreachable, the orchestrator automatically invokes the CPU baseline heuristic specialist (`vqa_specialist`). Never throws an unhandled 500 error.
+3. **Telemetry**: Backend telemetry automatically detects Modal endpoints and displays `VQA: Modal GPU` with a dedicated badge in the ISRO UI.
