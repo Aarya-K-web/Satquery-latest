@@ -1,0 +1,100 @@
+{"image": "data/raw/bigearth/S2A_MSIL2A_20230258_T43XYZ_000870.tif", "question": "List the land cover classes present in this image.", "answer": "Fruit trees and berry plantations, Water bodies, Construction sites"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20205326_T49XYZ_000471.tif", "question": "Are there any wetlands or marshes?", "answer": "No wetlands are visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20225102_T49XYZ_001505.tif", "question": "What is the dominant land cover?", "answer": "Dump sites"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20182275_T31XYZ_002117.tif", "question": "Describe the vegetation coverage", "answer": "No significant vegetation is visible; the area appears non-vegetated or built-up"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20194864_T46XYZ_001296.tif", "question": "Are there any wetlands or marshes?", "answer": "Yes, wetlands are visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20200407_T13XYZ_001642.tif", "question": "Are there any wetlands or marshes?", "answer": "Yes, wetlands are visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20214559_T10XYZ_002156.tif", "question": "How many land cover types are present?", "answer": "1 land cover types are present: Salt marshes"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20184322_T46XYZ_000698.tif", "question": "Is this area predominantly agricultural?", "answer": "Yes, agricultural areas dominate"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20183081_T18XYZ_001036.tif", "question": "Is forest present in this image?", "answer": "No forest is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20200125_T43XYZ_002362.tif", "question": "Is forest present in this image?", "answer": "No forest is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20208569_T32XYZ_001867.tif", "question": "What land cover types are visible?", "answer": "Olive groves, Land principally occupied by agriculture, Bare rock, Salines"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20211892_T32XYZ_000692.tif", "question": "How many land cover types are present?", "answer": "1 land cover types are present: Sparsely vegetated areas"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20230052_T43XYZ_000220.tif", "question": "Is there water in this image?", "answer": "No water is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20220938_T20XYZ_000880.tif", "question": "List the land cover classes present in this image.", "answer": "Agro-forestry areas"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20186640_T18XYZ_001314.tif", "question": "Describe the vegetation coverage", "answer": "Vegetation is present, including Permanent crops"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20214245_T25XYZ_001039.tif", "question": "Are there any wetlands or marshes?", "answer": "No wetlands are visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20220943_T44XYZ_000109.tif", "question": "How many land cover types are present?", "answer": "4 land cover types are present: Salines, Water bodies, Inland marshes, Inland waters"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20207209_T16XYZ_000754.tif", "question": "Are there any wetlands or marshes?", "answer": "No wetlands are visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20210845_T31XYZ_000186.tif", "question": "Is urban area present?", "answer": "No urban area is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20192744_T28XYZ_001065.tif", "question": "Are there any wetlands or marshes?", "answer": "Yes, wetlands are visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20183909_T21XYZ_002253.tif", "question": "Is forest present in this image?", "answer": "No forest is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20217678_T34XYZ_000722.tif", "question": "Is forest present in this image?", "answer": "No forest is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20175931_T22XYZ_001834.tif", "question": "Is urban area present?", "answer": "Yes, urban fabric is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20214242_T20XYZ_002265.tif", "question": "How many land cover types are present?", "answer": "3 land cover types are present: Burnt areas, Airports, Dump sites"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20185339_T28XYZ_002108.tif", "question": "Is this area predominantly agricultural?", "answer": "Yes, agricultural areas dominate"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20196721_T32XYZ_000888.tif", "question": "Is urban area present?", "answer": "No urban area is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20175332_T10XYZ_001244.tif", "question": "What land cover types are visible?", "answer": "Natural grassland, Sparsely vegetated areas, Mineral extraction sites"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20214946_T38XYZ_001516.tif", "question": "Is forest present in this image?", "answer": "No forest is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20227159_T12XYZ_000538.tif", "question": "List the land cover classes present in this image.", "answer": "Inland waters, Urban fabric"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20205550_T31XYZ_000805.tif", "question": "Is this area predominantly agricultural?", "answer": "Yes, agricultural areas dominate"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20193309_T12XYZ_002401.tif", "question": "How many land cover types are present?", "answer": "3 land cover types are present: Permanent crops, Bare rock, Transitional woodland/shrub"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20192247_T45XYZ_001756.tif", "question": "Is there water in this image?", "answer": "No water is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20196498_T16XYZ_000563.tif", "question": "Is forest present in this image?", "answer": "Yes, forest is present"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20222192_T35XYZ_002091.tif", "question": "What is the dominant land cover?", "answer": "Dump sites"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20172289_T26XYZ_002006.tif", "question": "Describe the vegetation coverage", "answer": "Vegetation is present, including Coniferous forest and Sclerophyllous vegetation"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20190203_T18XYZ_000238.tif", "question": "Is this area predominantly agricultural?", "answer": "No, agriculture is not dominant"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20177209_T36XYZ_002133.tif", "question": "How many land cover types are present?", "answer": "3 land cover types are present: Beaches, dunes, sands, Mineral extraction sites, Inland waters"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20190801_T43XYZ_002250.tif", "question": "List the land cover classes present in this image.", "answer": "Natural grassland"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20217870_T29XYZ_002309.tif", "question": "What is the dominant land cover?", "answer": "Salines"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20198470_T12XYZ_000878.tif", "question": "What land cover types are visible?", "answer": "Sea and ocean"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20225206_T40XYZ_002208.tif", "question": "Are there any wetlands or marshes?", "answer": "No wetlands are visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20220066_T18XYZ_000688.tif", "question": "What is the dominant land cover?", "answer": "Olive groves"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20216844_T12XYZ_001164.tif", "question": "Is forest present in this image?", "answer": "No forest is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20185599_T23XYZ_001214.tif", "question": "Describe the vegetation coverage", "answer": "Vegetation is present, including Olive groves"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20200278_T25XYZ_000536.tif", "question": "Is this area predominantly agricultural?", "answer": "No, agriculture is not dominant"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20196310_T10XYZ_001197.tif", "question": "What land cover types are visible?", "answer": "Rice fields, Complex cultivation patterns, Beaches, dunes, sands"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20224955_T20XYZ_002094.tif", "question": "Is there water in this image?", "answer": "No water is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20179298_T39XYZ_001487.tif", "question": "Is this area predominantly agricultural?", "answer": "Yes, agricultural areas dominate"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20192592_T35XYZ_000916.tif", "question": "Is this area predominantly agricultural?", "answer": "No, agriculture is not dominant"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20222055_T14XYZ_001246.tif", "question": "Is forest present in this image?", "answer": "No forest is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20191609_T43XYZ_000336.tif", "question": "Are there any wetlands or marshes?", "answer": "No wetlands are visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20199214_T15XYZ_000767.tif", "question": "What is the dominant land cover?", "answer": "Moors and heathland"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20226195_T11XYZ_000263.tif", "question": "How many land cover types are present?", "answer": "1 land cover types are present: Estuaries"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20210257_T47XYZ_000953.tif", "question": "Is there water in this image?", "answer": "Yes, there is an inland water body visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20181055_T17XYZ_000750.tif", "question": "Is there water in this image?", "answer": "No water is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20224472_T46XYZ_002177.tif", "question": "Is there water in this image?", "answer": "Yes, there is an inland water body visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20184545_T13XYZ_000154.tif", "question": "Is there water in this image?", "answer": "Yes, there is an inland water body visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20198505_T22XYZ_000231.tif", "question": "List the land cover classes present in this image.", "answer": "Permanent crops, Water courses"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20181402_T49XYZ_002317.tif", "question": "What land cover types are visible?", "answer": "Moors and heathland"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20203663_T34XYZ_000630.tif", "question": "List the land cover classes present in this image.", "answer": "Salines"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20215540_T46XYZ_001902.tif", "question": "Describe the vegetation coverage", "answer": "No significant vegetation is visible; the area appears non-vegetated or built-up"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20200661_T18XYZ_001185.tif", "question": "How many land cover types are present?", "answer": "4 land cover types are present: Estuaries, Rice fields, Salines, Port areas"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20222260_T10XYZ_002037.tif", "question": "Is there water in this image?", "answer": "Yes, there is an inland water body visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20194884_T31XYZ_002070.tif", "question": "Is urban area present?", "answer": "No urban area is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20205091_T21XYZ_000965.tif", "question": "List the land cover classes present in this image.", "answer": "Burnt areas, Fruit trees and berry plantations"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20180781_T36XYZ_001817.tif", "question": "Is this area predominantly agricultural?", "answer": "No, agriculture is not dominant"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20207057_T17XYZ_000260.tif", "question": "Are there any wetlands or marshes?", "answer": "No wetlands are visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20173233_T42XYZ_001241.tif", "question": "What land cover types are visible?", "answer": "Water courses, Road and rail networks, Burnt areas"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20214085_T21XYZ_000414.tif", "question": "List the land cover classes present in this image.", "answer": "Coastal lagoons, Port areas, Sea and ocean"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20227406_T18XYZ_001764.tif", "question": "List the land cover classes present in this image.", "answer": "Coastal lagoons, Mineral extraction sites"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20229860_T35XYZ_001507.tif", "question": "Is there water in this image?", "answer": "Yes, there is an inland water body visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20217195_T25XYZ_002402.tif", "question": "Is urban area present?", "answer": "No urban area is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20187645_T16XYZ_000146.tif", "question": "Is urban area present?", "answer": "No urban area is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20225703_T38XYZ_000869.tif", "question": "What land cover types are visible?", "answer": "Peatbogs, Broad-leaved forest"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20212980_T20XYZ_001988.tif", "question": "Is this area predominantly agricultural?", "answer": "No, agriculture is not dominant"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20222415_T15XYZ_001127.tif", "question": "Are there any wetlands or marshes?", "answer": "Yes, wetlands are visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20204040_T11XYZ_001177.tif", "question": "What land cover types are visible?", "answer": "Permanent crops, Pastures, Land principally occupied by agriculture, Beaches, dunes, sands"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20192061_T47XYZ_000321.tif", "question": "What land cover types are visible?", "answer": "Sclerophyllous vegetation"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20222055_T14XYZ_001246.tif", "question": "Are there any wetlands or marshes?", "answer": "No wetlands are visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20227858_T32XYZ_000307.tif", "question": "Describe the vegetation coverage", "answer": "Vegetation is present, including Pastures"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20228873_T27XYZ_000340.tif", "question": "Is urban area present?", "answer": "No urban area is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20181905_T11XYZ_001105.tif", "question": "Are there any wetlands or marshes?", "answer": "No wetlands are visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20218139_T50XYZ_000707.tif", "question": "Is there water in this image?", "answer": "No water is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20215899_T27XYZ_000513.tif", "question": "Is this area predominantly agricultural?", "answer": "No, agriculture is not dominant"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20221558_T29XYZ_000915.tif", "question": "Is there water in this image?", "answer": "Yes, there is an inland water body visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20227427_T10XYZ_001116.tif", "question": "Is this area predominantly agricultural?", "answer": "No, agriculture is not dominant"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20230474_T22XYZ_001387.tif", "question": "What is the dominant land cover?", "answer": "Coastal lagoons"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20190742_T33XYZ_002297.tif", "question": "List the land cover classes present in this image.", "answer": "Sport and leisure facilities, Salt marshes, Broad-leaved forest, Agro-forestry areas"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20185649_T44XYZ_000526.tif", "question": "Describe the vegetation coverage", "answer": "Vegetation is present, including Broad-leaved forest"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20202176_T28XYZ_000021.tif", "question": "List the land cover classes present in this image.", "answer": "Fruit trees and berry plantations, Construction sites"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20192592_T35XYZ_000916.tif", "question": "How many land cover types are present?", "answer": "1 land cover types are present: Green urban areas"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20182460_T25XYZ_001941.tif", "question": "Is there water in this image?", "answer": "Yes, there is an inland water body visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20210539_T18XYZ_001474.tif", "question": "How many land cover types are present?", "answer": "2 land cover types are present: Fruit trees and berry plantations, Olive groves"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20180910_T29XYZ_000724.tif", "question": "What land cover types are visible?", "answer": "Bare rock, Peatbogs"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20175658_T34XYZ_001377.tif", "question": "What land cover types are visible?", "answer": "Permanent crops, Port areas, Burnt areas"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20214658_T50XYZ_001793.tif", "question": "What land cover types are visible?", "answer": "Green urban areas, Salt marshes, Olive groves, Mineral extraction sites"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20190029_T16XYZ_002307.tif", "question": "Is forest present in this image?", "answer": "No forest is visible"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20218721_T48XYZ_002139.tif", "question": "What land cover types are visible?", "answer": "Agro-forestry areas, Arable land, Dump sites"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20217385_T49XYZ_002355.tif", "question": "What is the dominant land cover?", "answer": "Water courses"}
+{"image": "data/raw/bigearth/S2A_MSIL2A_20206490_T36XYZ_000651.tif", "question": "Is there water in this image?", "answer": "No water is visible"}

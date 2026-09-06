@@ -7,9 +7,17 @@ __pycache__/
 .coverage
 htmlcov/
 
+# Large model weights - track via Git LFS or keep final adapter only
+# models/*.safetensors
+# models/**/*.pt
+# Uncomment to ignore models entirely (use HF Hub):
+# models/
+
 # Temporary uploads & logs
 uploads/
 *.log
+checkpoints/
+lightning_logs/
 
 # Environments & IDEs
 .venv/
