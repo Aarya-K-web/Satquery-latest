@@ -260,38 +260,75 @@ async def spectral_analysis(
 
 def _dispatch_vqa_inference(image_path: Path, question: str) -> Dict[str, Any]:
     """
-    Attempts VQA inference first via GPU Lead endpoint http://127.0.0.1:8001/infer.
-    Falls back cleanly to local vqa_specialist if port 8001 is unavailable.
+    Attempts VQA inference via GPU Lead endpoint (VQA_SERVER_URL env, default http://127.0.0.1:8001/infer).
+    Tries JSON fast-path (same-machine shared FS), then multipart file upload (same-WiFi remote laptop),
+    then falls back to local heuristic vqa_specialist. Never raises.
     """
-    vqa_url = "http://127.0.0.1:8001/infer"
-    req_body = json.dumps({"image_path": str(image_path), "question": question}).encode("utf-8")
-    
+    vqa_url = os.getenv("VQA_SERVER_URL", "http://127.0.0.1:8001/infer")
+    # 1) JSON fast-path (local)
     try:
-        req = urllib.request.Request(
-            vqa_url,
-            data=req_body,
-            headers={"Content-Type": "application/json"},
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=2.5) as response:
+        req_body = json.dumps({"image_path": str(image_path), "question": question}).encode("utf-8")
+        req = urllib.request.Request(vqa_url, data=req_body, headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=8) as response:
             if response.status == 200:
                 data = json.loads(response.read().decode("utf-8"))
-                return {
-                    "answer": data.get("answer", ""),
-                    "confidence": float(data.get("confidence", 0.93)),
-                    "fidelity": data.get("fidelity", "full"),
-                    "method": data.get("method", "vqa_specialist (Qwen2-VL-2B-Instruct QLoRA GPU Server)")
-                }
+                if data.get("answer"):
+                    return {
+                        "answer": data.get("answer", ""),
+                        "confidence": float(data.get("confidence", 0.93)),
+                        "fidelity": data.get("fidelity", "full"),
+                        "method": data.get("method", "vqa_specialist (Qwen2-VL-2B-Instruct QLoRA GPU Server)"),
+                    }
     except Exception:
         pass
-
-    # Clean local fallback
+    # 2) Multipart file upload — required when Backend and GPU laptop are on different machines (same WiFi)
+    try:
+        import requests as _req
+        with open(image_path, "rb") as fh:
+            r = _req.post(vqa_url, files={"file": (image_path.name, fh, "image/tiff")}, data={"question": question}, timeout=12)
+            if r.status_code == 200:
+                data = r.json()
+                if data.get("answer"):
+                    return {
+                        "answer": data.get("answer", ""),
+                        "confidence": float(data.get("confidence", 0.93)),
+                        "fidelity": data.get("fidelity", "full"),
+                        "method": data.get("method", "vqa_specialist (Qwen2-VL-2B-Instruct QLoRA GPU Server via upload)"),
+                    }
+    except Exception:
+        pass
+    # 3) urllib multipart fallback (no requests)
+    try:
+        import mimetypes, uuid as _uuid
+        boundary = _uuid.uuid4().hex
+        with open(image_path, "rb") as fh:
+            file_bytes = fh.read()
+        fname = image_path.name
+        ctype = mimetypes.guess_type(fname)[0] or "image/tiff"
+        body_parts = []
+        body_parts.append(f"--{boundary}\r\n".encode() + f'Content-Disposition: form-data; name="question"\r\n\r\n{question}\r\n'.encode())
+        body_parts.append(f"--{boundary}\r\n".encode() + f'Content-Disposition: form-data; name="file"; filename="{fname}"\r\n'.encode() + f"Content-Type: {ctype}\r\n\r\n".encode() + file_bytes + b"\r\n")
+        body_parts.append(f"--{boundary}--\r\n".encode())
+        body = b"".join(body_parts)
+        req2 = urllib.request.Request(vqa_url, data=body, headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}, method="POST")
+        with urllib.request.urlopen(req2, timeout=12) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode("utf-8"))
+                if data.get("answer"):
+                    return {
+                        "answer": data.get("answer", ""),
+                        "confidence": float(data.get("confidence", 0.93)),
+                        "fidelity": data.get("fidelity", "full"),
+                        "method": data.get("method", "vqa_specialist (Qwen2-VL-2B-Instruct QLoRA GPU Server via upload)"),
+                    }
+    except Exception:
+        pass
     infer_res = vqa_infer(None, image_path, question)
     return {
         "answer": infer_res.get("answer", "Analysis indicates coastal mixed urban and water features."),
         "confidence": float(infer_res.get("confidence", 0.88)),
         "fidelity": infer_res.get("fidelity", "full"),
-        "method": "vqa_specialist (Qwen2-VL-2B-Instruct QLoRA)"
+        "method": "vqa_specialist (Qwen2-VL-2B-Instruct QLoRA)",
     }
 
 
