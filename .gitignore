@@ -16,6 +16,8 @@ htmlcov/
 # Temporary uploads & logs
 uploads/
 *.log
+data/*.db
+*.db
 checkpoints/
 lightning_logs/
 

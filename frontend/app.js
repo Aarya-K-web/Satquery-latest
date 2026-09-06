@@ -540,9 +540,26 @@ async function executeActiveQuery() {
   const btnText = document.getElementById('submit-btn-text');
   const spinner = document.getElementById('submit-spinner');
 
-  if (btnText) btnText.textContent = "SYNTHESIZING EVIDENCE...";
   if (spinner) spinner.classList.remove('hidden');
   if (submitBtn) submitBtn.disabled = true;
+
+  // Progressive loading status for long-running VQA / Specialist inference
+  const loadingSteps = [
+    "STAGE 01 :: INPUT GATE & SENSOR CARD...",
+    "STAGE 03 :: EVIDENCE CONTRACT VALIDATION...",
+    "STAGE 04 :: AGENTIC ROUTER DISPATCH...",
+    "STAGE 05 :: VQA REASONING ENGINE ACTIVE...",
+    "STAGE 06 :: EVIDENCE GUARD SPECTRAL VERIFY...",
+    "STAGE 07 :: SYNTHESIZING RESPONSE ENVELOPE..."
+  ];
+  let stepIdx = 0;
+  if (btnText) btnText.textContent = loadingSteps[0];
+  const stepInterval = setInterval(() => {
+    stepIdx = (stepIdx + 1) % loadingSteps.length;
+    if (btnText && submitBtn && submitBtn.disabled) {
+      btnText.textContent = loadingSteps[stepIdx];
+    }
+  }, 900);
 
   try {
     const formData = new FormData();
@@ -603,6 +620,7 @@ async function executeActiveQuery() {
     console.error('Query execution error:', err);
     alert('Query execution failed. Check console for details.');
   } finally {
+    clearInterval(stepInterval);
     if (btnText) btnText.innerHTML = `
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polygon points="5 3 19 12 5 21 5 3"/>
