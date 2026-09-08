@@ -14,9 +14,10 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import numpy as np
 
-# Global cache for sentence-transformers model
+# Global cache for sentence-transformers model & precomputed prototype embeddings
 _EMBED_MODEL = None
 _EMBED_MODEL_LOADED = False
+_PRECOMPUTED_PROTOTYPE_EMBEDDINGS: Dict[str, Any] = {}
 
 # Task prototype anchors for semantic similarity
 TASK_PROTOTYPES = {
@@ -38,6 +39,18 @@ TASK_PROTOTYPES = {
 }
 
 
+def warmup_router():
+    """Warms up the embedding model and pre-computes prototype embeddings on container startup."""
+    global _PRECOMPUTED_PROTOTYPE_EMBEDDINGS
+    model = _get_embedding_model()
+    if model is not None:
+        try:
+            for task, protos in TASK_PROTOTYPES.items():
+                _PRECOMPUTED_PROTOTYPE_EMBEDDINGS[task] = model.encode(protos)
+        except Exception:
+            _PRECOMPUTED_PROTOTYPE_EMBEDDINGS = {}
+
+
 def _get_embedding_model():
     """Lazily loads the sentence-transformers model if explicitly enabled and available."""
     global _EMBED_MODEL, _EMBED_MODEL_LOADED
@@ -54,6 +67,8 @@ def _get_embedding_model():
         from sentence_transformers import SentenceTransformer
         _EMBED_MODEL = SentenceTransformer('all-MiniLM-L6-v2')
         _EMBED_MODEL_LOADED = True
+        # Precompute embeddings upon model loading
+        warmup_router()
     except Exception:
         _EMBED_MODEL = None
         _EMBED_MODEL_LOADED = True
@@ -73,6 +88,7 @@ def _cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
 def _semantic_route_similarity(query: str) -> Dict[str, Any]:
     """
     Computes semantic similarity against task prototypes using sentence-transformers.
+    Uses pre-computed prototype embeddings for sub-millisecond similarity computation.
     Falls back to token Jaccard similarity if sentence-transformers is unavailable.
     """
     model = _get_embedding_model()
@@ -85,7 +101,12 @@ def _semantic_route_similarity(query: str) -> Dict[str, Any]:
             best_score = -1.0
             
             for task, prototypes in TASK_PROTOTYPES.items():
-                p_embs = model.encode(prototypes)
+                if task in _PRECOMPUTED_PROTOTYPE_EMBEDDINGS:
+                    p_embs = _PRECOMPUTED_PROTOTYPE_EMBEDDINGS[task]
+                else:
+                    p_embs = model.encode(prototypes)
+                    _PRECOMPUTED_PROTOTYPE_EMBEDDINGS[task] = p_embs
+                    
                 for p_emb in p_embs:
                     sim = _cosine_similarity(q_emb, p_emb)
                     if sim > best_score:

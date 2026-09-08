@@ -527,7 +527,7 @@ function hideAllResultCards() {
 }
 
 /**
- * 6. Execute Evidence Query
+ * 6. Execute Evidence Query with Multi-Stage Loading Progression
  */
 async function executeActiveQuery() {
   const qInput = document.getElementById('query-input');
@@ -540,27 +540,58 @@ async function executeActiveQuery() {
   const submitBtn = document.getElementById('btn-submit-query');
   const btnText = document.getElementById('submit-btn-text');
   const spinner = document.getElementById('submit-spinner');
+  const stepperBox = document.getElementById('loading-stepper-box');
+  const stepperBar = document.getElementById('stepper-bar-fill');
+  const stepperText = document.getElementById('stepper-subtext');
+  const stepperTimer = document.getElementById('stepper-timer');
 
   if (spinner) spinner.classList.remove('hidden');
   if (submitBtn) submitBtn.disabled = true;
+  if (stepperBox) stepperBox.classList.remove('hidden');
 
-  // Progressive loading status for long-running VQA / Specialist inference
-  const loadingSteps = [
-    "STAGE 01 :: INPUT GATE & SENSOR CARD...",
-    "STAGE 03 :: EVIDENCE CONTRACT VALIDATION...",
-    "STAGE 04 :: AGENTIC ROUTER DISPATCH...",
-    "STAGE 05 :: VQA REASONING ENGINE ACTIVE...",
-    "STAGE 06 :: EVIDENCE GUARD SPECTRAL VERIFY...",
-    "STAGE 07 :: SYNTHESIZING RESPONSE ENVELOPE..."
+  // Progressive loading stages
+  const stages = [
+    { num: 1, pct: 20, label: "Stage 1/5 :: Analyzing Imagery & Extracting Sensor Card..." },
+    { num: 2, pct: 40, label: "Stage 2/5 :: Routing Query via Agentic Rule Overrides..." },
+    { num: 3, pct: 60, label: "Stage 3/5 :: Running Specialist Inference Engine..." },
+    { num: 4, pct: 80, label: "Stage 4/5 :: Verifying Physics & Spectral Indices (NDWI/NDVI)..." },
+    { num: 5, pct: 100, label: "Stage 5/5 :: Synthesizing Evidence Envelope & PDF Report..." }
   ];
-  let stepIdx = 0;
-  if (btnText) btnText.textContent = loadingSteps[0];
-  const stepInterval = setInterval(() => {
-    stepIdx = (stepIdx + 1) % loadingSteps.length;
-    if (btnText && submitBtn && submitBtn.disabled) {
-      btnText.textContent = loadingSteps[stepIdx];
+
+  function updateStepperStage(stageIndex) {
+    const s = stages[Math.min(stageIndex, stages.length - 1)];
+    if (stepperBar) stepperBar.style.width = `${s.pct}%`;
+    if (stepperText) stepperText.textContent = s.label;
+    if (btnText) btnText.textContent = s.label.slice(12, 45) + "...";
+
+    for (let i = 1; i <= 5; i++) {
+      const node = document.getElementById(`step-node-${i}`);
+      if (node) {
+        if (i < s.num) {
+          node.className = 'step-node completed';
+        } else if (i === s.num) {
+          node.className = 'step-node active';
+        } else {
+          node.className = 'step-node';
+        }
+      }
     }
-  }, 900);
+  }
+
+  // Initial stage
+  updateStepperStage(0);
+  const startTime = Date.now();
+  let currentStageIdx = 0;
+
+  const progressInterval = setInterval(() => {
+    currentStageIdx = (currentStageIdx + 1) % stages.length;
+    updateStepperStage(currentStageIdx);
+  }, 450);
+
+  const timerInterval = setInterval(() => {
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    if (stepperTimer) stepperTimer.textContent = `${elapsed}s`;
+  }, 100);
 
   try {
     const formData = new FormData();
@@ -578,6 +609,10 @@ async function executeActiveQuery() {
     });
     const data = await res.json();
     state.lastQueryResponse = data;
+
+    // Finalize progress visual to 100%
+    updateStepperStage(4);
+    if (stepperText) stepperText.textContent = "Pipeline Execution Complete. Rendering Evidence Output...";
 
     // Dynamically update VQA engine indicator based on execution method
     if (data.method) {
@@ -627,7 +662,11 @@ async function executeActiveQuery() {
     console.error('Query execution error:', err);
     alert('Query execution failed. Check console for details.');
   } finally {
-    clearInterval(stepInterval);
+    clearInterval(progressInterval);
+    clearInterval(timerInterval);
+    if (stepperBox) {
+      setTimeout(() => stepperBox.classList.add('hidden'), 600);
+    }
     if (btnText) btnText.innerHTML = `
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polygon points="5 3 19 12 5 21 5 3"/>

@@ -156,6 +156,46 @@
           </span>
         </button>
 
+        <!-- MULTI-STAGE REASONING PIPELINE LOADING PROGRESS -->
+        <div class="loading-stepper-box hidden" id="loading-stepper-box">
+          <div class="stepper-header">
+            <div class="stepper-title-wrap">
+              <span class="stepper-pulse-dot"></span>
+              <span class="stepper-title" id="stepper-main-text">PIPELINE EXECUTION IN PROGRESS...</span>
+            </div>
+            <span class="stepper-latency-clock" id="stepper-timer">0.0s</span>
+          </div>
+
+          <div class="stepper-bar-track">
+            <div class="stepper-bar-fill" id="stepper-bar-fill" style="width: 20%;"></div>
+          </div>
+
+          <div class="stepper-steps-grid">
+            <div class="step-node active" id="step-node-1">
+              <span class="step-icon">01</span>
+              <span class="step-txt">Ingestion</span>
+            </div>
+            <div class="step-node" id="step-node-2">
+              <span class="step-icon">02</span>
+              <span class="step-txt">Routing</span>
+            </div>
+            <div class="step-node" id="step-node-3">
+              <span class="step-icon">03</span>
+              <span class="step-txt">Specialist</span>
+            </div>
+            <div class="step-node" id="step-node-4">
+              <span class="step-icon">04</span>
+              <span class="step-txt">Guard</span>
+            </div>
+            <div class="step-node" id="step-node-5">
+              <span class="step-icon">05</span>
+              <span class="step-txt">Report</span>
+            </div>
+          </div>
+
+          <div class="stepper-desc" id="stepper-subtext">Analyzing Imagery & Extracting Sensor Metadata...</div>
+        </div>
+
         <!-- RESULTS & REPORT AREA (FOUR DEDICATED CARDS) -->
         <div class="results-container" id="results-container">
           <div class="block-label">

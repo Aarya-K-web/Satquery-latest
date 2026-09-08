@@ -495,6 +495,147 @@ textarea#query-input:focus {
   box-shadow: var(--accent-cyan-glow);
 }
 
+.submit-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  filter: grayscale(0.2);
+}
+
+/* ════════════ MULTI-STAGE LOADING STEPPER ════════════ */
+.loading-stepper-box {
+  background: #0a1120;
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.12);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: fadeIn 0.2s ease;
+}
+
+.stepper-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stepper-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.stepper-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--accent-cyan);
+  box-shadow: 0 0 8px var(--accent-cyan);
+  animation: pulseDot 1s infinite alternate;
+}
+
+@keyframes pulseDot {
+  from { opacity: 0.4; transform: scale(0.85); }
+  to { opacity: 1.0; transform: scale(1.15); }
+}
+
+.stepper-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: #ffffff;
+}
+
+.stepper-latency-clock {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent-cyan);
+  background: rgba(0, 240, 255, 0.1);
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 240, 255, 0.25);
+}
+
+.stepper-bar-track {
+  height: 4px;
+  background: #131b2e;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.stepper-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0088aa 0%, #00f0ff 100%);
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+  border-radius: 2px;
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stepper-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+.step-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 2px;
+  border-radius: 3px;
+  background: #0d1527;
+  border: 1px solid #1e293b;
+  font-family: var(--font-mono);
+  transition: all 0.2s ease;
+}
+
+.step-node .step-icon {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.step-node .step-txt {
+  font-size: 8px;
+  color: var(--text-dim);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.step-node.active {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.25);
+}
+
+.step-node.active .step-icon,
+.step-node.active .step-txt {
+  color: var(--accent-cyan);
+  font-weight: 700;
+}
+
+.step-node.completed {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.step-node.completed .step-icon,
+.step-node.completed .step-txt {
+  color: var(--status-green);
+}
+
+.stepper-desc {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: #94a3b8;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 5px;
+  text-align: center;
+}
+
 /* ════════════ RESULTS & FOUR RESULT CARDS ════════════ */
 .results-container {
   display: flex;

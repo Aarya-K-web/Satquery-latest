@@ -27,7 +27,8 @@ from src.input_gate import validate_geotiff, extract_metadata, detect_sensor, es
 from src.sensor_card import generate_card, render_card
 from src.spectral_check import compute_ndwi, compute_ndvi, otsu_threshold, compute_overlap
 from src.evidence_contract import evaluate_contract, build_refusal_envelope
-from src.agentic_router import route_query
+from contextlib import asynccontextmanager
+from src.agentic_router import route_query, warmup_router
 from src.trace_logger import PipelineTracer, log_trace, get_recent_traces, init_db
 from src.specialists.caption_grounding import run as run_caption_grounding
 from src.specialists.change_detection import run as run_change_detection
@@ -37,11 +38,21 @@ from src.evidence_guard import verify_evidence
 from src.confidence_engine import calculate_confidence
 from src.output_renderer import generate_pdf_report
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Container startup & shutdown lifecycle: warm up SQLite trace db and router embedding cache."""
+    init_db()
+    warmup_router()
+    yield
+
+
 # Initialize FastAPI App
 app = FastAPI(
     title="SatQuery EvidenceSwarm (SIH26167)",
     description="ISRO-grade Geospatial EvidenceSwarm Pipeline: Input Gate, Sensor Card, Evidence Contract, Agentic Router, Specialists, Evidence Guard, and SQLite Auditing.",
-    version="3.0.0"
+    version="3.0.0",
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -298,7 +309,7 @@ def _dispatch_vqa_inference(image_path: Path, question: str) -> Dict[str, Any]:
     Attempts VQA inference via GPU Lead endpoint (VQA_SERVER_URL env, default http://127.0.0.1:8001/infer).
     Optimized dispatch:
     - Remote endpoints (https://, modal.run, modal.com, ngrok, etc.): Skips JSON fast-path and uploads file via multipart with 25s timeout for serverless cold starts.
-    - Local endpoints (localhost / 127.0.0.1): Tries shared-filesystem JSON fast-path first.
+    - Local endpoints (localhost / 127.0.0.1): Tries shared-filesystem JSON fast-path first with short timeout.
     - Never raises: Falls back gracefully to heuristic CPU specialist.
     """
     vqa_url = os.getenv("VQA_SERVER_URL", "http://127.0.0.1:8001/infer")
@@ -311,7 +322,7 @@ def _dispatch_vqa_inference(image_path: Path, question: str) -> Dict[str, Any]:
         try:
             req_body = json.dumps({"image_path": str(image_path), "question": question}).encode("utf-8")
             req = urllib.request.Request(vqa_url, data=req_body, headers={"Content-Type": "application/json"}, method="POST")
-            with urllib.request.urlopen(req, timeout=8) as response:
+            with urllib.request.urlopen(req, timeout=2.5) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode("utf-8"))
                     if data.get("answer"):
@@ -322,52 +333,53 @@ def _dispatch_vqa_inference(image_path: Path, question: str) -> Dict[str, Any]:
                             "method": data.get("method", "vqa_specialist (Qwen2-VL-2B-Instruct QLoRA GPU Server)"),
                         }
         except Exception:
+            # On localhost, if port 8001 is closed, do NOT waste 50s on multipart retries
+            pass
+    elif is_remote:
+        # 2) Multipart file upload — required for remote endpoints (Modal/Tunnel)
+        # Timeout 25s accommodates Modal serverless cold starts
+        try:
+            import requests as _req
+            with open(image_path, "rb") as fh:
+                r = _req.post(vqa_url, files={"file": (image_path.name, fh, "image/tiff")}, data={"question": question}, timeout=25)
+                if r.status_code == 200:
+                    data = r.json()
+                    if data.get("answer"):
+                        return {
+                            "answer": data.get("answer", ""),
+                            "confidence": float(data.get("confidence", 0.93)),
+                            "fidelity": data.get("fidelity", "full"),
+                            "method": data.get("method", "vqa_specialist (Qwen2-VL-2B-Instruct QLoRA GPU Server via upload)"),
+                        }
+        except Exception:
             pass
 
-    # 2) Multipart file upload — required for remote endpoints (Modal/Tunnel) or cross-machine GPU
-    # Timeout 25s accommodates Modal serverless cold starts
-    try:
-        import requests as _req
-        with open(image_path, "rb") as fh:
-            r = _req.post(vqa_url, files={"file": (image_path.name, fh, "image/tiff")}, data={"question": question}, timeout=25)
-            if r.status_code == 200:
-                data = r.json()
-                if data.get("answer"):
-                    return {
-                        "answer": data.get("answer", ""),
-                        "confidence": float(data.get("confidence", 0.93)),
-                        "fidelity": data.get("fidelity", "full"),
-                        "method": data.get("method", "vqa_specialist (Qwen2-VL-2B-Instruct QLoRA GPU Server via upload)"),
-                    }
-    except Exception:
-        pass
-
-    # 3) urllib multipart fallback (no requests) with 25s timeout
-    try:
-        import mimetypes, uuid as _uuid
-        boundary = _uuid.uuid4().hex
-        with open(image_path, "rb") as fh:
-            file_bytes = fh.read()
-        fname = image_path.name
-        ctype = mimetypes.guess_type(fname)[0] or "image/tiff"
-        body_parts = []
-        body_parts.append(f"--{boundary}\r\n".encode() + f'Content-Disposition: form-data; name="question"\r\n\r\n{question}\r\n'.encode())
-        body_parts.append(f"--{boundary}\r\n".encode() + f'Content-Disposition: form-data; name="file"; filename="{fname}"\r\n'.encode() + f"Content-Type: {ctype}\r\n\r\n".encode() + file_bytes + b"\r\n")
-        body_parts.append(f"--{boundary}--\r\n".encode())
-        body = b"".join(body_parts)
-        req2 = urllib.request.Request(vqa_url, data=body, headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}, method="POST")
-        with urllib.request.urlopen(req2, timeout=25) as response:
-            if response.status == 200:
-                data = json.loads(response.read().decode("utf-8"))
-                if data.get("answer"):
-                    return {
-                        "answer": data.get("answer", ""),
-                        "confidence": float(data.get("confidence", 0.93)),
-                        "fidelity": data.get("fidelity", "full"),
-                        "method": data.get("method", "vqa_specialist (Qwen2-VL-2B-Instruct QLoRA GPU Server via upload)"),
-                    }
-    except Exception:
-        pass
+        # 3) urllib multipart fallback (no requests) with 25s timeout
+        try:
+            import mimetypes, uuid as _uuid
+            boundary = _uuid.uuid4().hex
+            with open(image_path, "rb") as fh:
+                file_bytes = fh.read()
+            fname = image_path.name
+            ctype = mimetypes.guess_type(fname)[0] or "image/tiff"
+            body_parts = []
+            body_parts.append(f"--{boundary}\r\n".encode() + f'Content-Disposition: form-data; name="question"\r\n\r\n{question}\r\n'.encode())
+            body_parts.append(f"--{boundary}\r\n".encode() + f'Content-Disposition: form-data; name="file"; filename="{fname}"\r\n'.encode() + f"Content-Type: {ctype}\r\n\r\n".encode() + file_bytes + b"\r\n")
+            body_parts.append(f"--{boundary}--\r\n".encode())
+            body = b"".join(body_parts)
+            req2 = urllib.request.Request(vqa_url, data=body, headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}, method="POST")
+            with urllib.request.urlopen(req2, timeout=25) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode("utf-8"))
+                    if data.get("answer"):
+                        return {
+                            "answer": data.get("answer", ""),
+                            "confidence": float(data.get("confidence", 0.93)),
+                            "fidelity": data.get("fidelity", "full"),
+                            "method": data.get("method", "vqa_specialist (Qwen2-VL-2B-Instruct QLoRA GPU Server via upload)"),
+                        }
+        except Exception:
+            pass
 
     # 4) Heuristic CPU fallback
     infer_res = vqa_infer(None, image_path, question)
@@ -727,6 +739,8 @@ async def execute_query(
 
 @app.post("/api/export-pdf")
 @app.post("/export-pdf")
+@app.post("/api/report")
+@app.post("/report")
 async def export_pdf(report_data: Dict[str, Any] = Body(...)):
     """Generates a downloadable ISRO Geospatial Intelligence PDF report."""
     try:

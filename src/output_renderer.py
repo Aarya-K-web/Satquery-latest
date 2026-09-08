@@ -135,7 +135,13 @@ def generate_pdf_report(
 
     # 2. Query & Executive Reasoning Output
     query_text = _sanitize_text(data.get("query_text") or data.get("query") or "Geospatial evidence analysis query")
-    answer_text = _sanitize_text(data.get("answer_or_summary") or data.get("answer") or "No analysis summary available.")
+    
+    if status == "REFUSED" or data.get("status") == "refused":
+        reason = data.get("reason") or data.get("refusal_reason") or "Evidence Contract validation failed."
+        suggestion = data.get("suggestion") or data.get("remediation") or "Please provide compliant co-registered multi-sensor inputs."
+        answer_text = _sanitize_text(f"[EVIDENCE CONTRACT REFUSAL GATE ACTIVATED]\nReason: {reason}\nRemediation: {suggestion}")
+    else:
+        answer_text = _sanitize_text(data.get("answer_or_summary") or data.get("answer") or "No analysis summary available.")
 
     # Section Heading
     pdf.set_font("Helvetica", "B", 9)
